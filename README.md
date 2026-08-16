@@ -254,9 +254,15 @@ Bez UA Googlebota `www.onet.pl` zwraca pusty szkielet (strona renderowana po str
 
 `get_articles()` obsługuje: sortowanie (`newest`, `oldest`, `title`, `read`), wyszukiwanie po `title`/`summary` oraz filtr nieprzeczytanych.
 
+Sortowanie `newest` i `read` opiera się na `last_seen` (momencie wykrycia artykułu w czytelniku), a nie na `published_at`. Dzięki temu otwarcie artykułu — które ustawia `published_at` — nie przemieszcza go w liście. Data publikacji jest zachowywana w bazie i wyświetlana w podglądzie.
+
 ### Data publikacji artykułów
 
-Data publikacji (`published_at`) jest wyciągana z JSON-LD (`"datePublished"`) lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy po otwarciu artykułu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy otwarciu (`mark_read_and_store`). W interfejsie lista i podgląd pokazują datę publikacji; gdy jest nieznana, fallback do `last_seen`.
+Data publikacji (`published_at`) jest wyciągana z JSON-LD (`"datePublished"`) lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy po otwarciu artykułu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy otwarciu (`mark_read_and_store`). W podglądzie pokazuje się ją data publikacji.
+
+### Zachowanie podglądu podczas odświeżania
+
+Po otwarciu artykułu jego treść jest wyświetlana w prawym panelu. Automatyczne odświeżanie (lub ręczne przyciskiem "Odśwież") przeładowuje listę z API, ale **zachowuje aktualnie otwarty podgląd**, jeśli wybrany artykuł nadal znajduje się w wynikach. Podgląd jest wyczyszczony tylko wtedy, gdy artykuł zostanie odfiltrowany (np. po zmianie kategorii, wyszukiwania lub filtru "tylko nieprzeczytane").
 
 ### Style interfejsu
 

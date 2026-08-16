@@ -147,7 +147,16 @@
   #list {
     display: flex; flex-direction: column; gap: 8px;
     min-width: 0;
+    max-height: calc(100vh - 148px);
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
   }
+  #list::-webkit-scrollbar { width: 8px; }
+  #list::-webkit-scrollbar-track { background: transparent; }
+  #list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  #list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   .item {
     display: flex; align-items: center; gap: 12px;
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
@@ -343,7 +352,7 @@ function fmt(iso) {
 }
 
 function articleTime(a) {
-  return fmt(a.published_at || a.last_seen);
+  return fmt(a.last_seen);
 }
 
 function catLabel(key) {
@@ -365,11 +374,29 @@ function renderTabs() {
       c.textContent = state.counts[key];
       d.appendChild(c);
     }
-    d.onclick = () => { state.category = key; loadArticles(); };
+    d.onclick = () => { state.category = key; renderTabs(); loadArticles(); };
     t.appendChild(d);
   }
-  const active = t.querySelector(".tab.active");
-  if (active) active.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  const tabs = $("tabs");
+  const active = tabs.querySelector(".tab.active");
+  if (active) {
+    const t = tabs.getBoundingClientRect();
+    const a = active.getBoundingClientRect();
+    tabs.scrollLeft += a.left - t.left - (t.width - a.width) / 2;
+  }
+}
+
+function scrollSelectedIntoView() {
+  const list = $("list");
+  const el = list.querySelector(".item.selected");
+  if (!el) return;
+  const listRect = list.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const top = elRect.top - listRect.top + list.scrollTop;
+  const viewH = list.clientHeight;
+  if (top < list.scrollTop || top + el.offsetHeight > list.scrollTop + viewH) {
+    list.scrollTop = Math.max(0, top - (viewH - el.offsetHeight) / 2);
+  }
 }
 
 function renderList() {
@@ -381,6 +408,7 @@ function renderList() {
     return;
   }
   empty.style.display = "none";
+  const prevScroll = list.scrollTop;
   list.innerHTML = "";
   for (const a of state.articles) {
     const el = document.createElement("div");
@@ -401,14 +429,16 @@ function renderList() {
     el.onclick = () => selectArticle(a);
     list.appendChild(el);
   }
+  list.scrollTop = prevScroll;
+  scrollSelectedIntoView();
 }
 
 async function loadArticles() {
   const list = $("list");
   list.innerHTML = '<div id="loader"><div id="spinner"></div>Ładowanie...</div>';
   $("empty").style.display = "none";
-  state.selected = null;
-  renderPreview(null);
+  const prevSelected = state.selected;
+  const prevPreviewBody = $("preview-body").innerHTML;
 
   const url = new URL("/api/articles", location.origin);
   url.searchParams.set("category", state.category);
@@ -422,6 +452,14 @@ async function loadArticles() {
     state.articles = data;
   } catch (e) {
     state.articles = [];
+  }
+
+  if (prevSelected && state.articles.some((a) => a.link === prevSelected)) {
+    state.selected = prevSelected;
+    $("preview-body").innerHTML = prevPreviewBody;
+  } else {
+    state.selected = null;
+    renderPreview(null);
   }
   renderList();
 }
@@ -491,7 +529,8 @@ async function waitForRefresh(res) {
     : (res.reason || "Czekam na odświeżenie (min. 140 s)");
   btn.textContent = `${reason}...`;
   setNote(reason + " — system poczeka i odświeży automatycznie");
-  const until = Date.now() + (res.wait_seconds || 0) * 1000;
+  const waitMs = Math.max((res.wait_seconds || 0) * 1000, 2000);
+  const until = Date.now() + waitMs;
   while (Date.now() < until) {
     const left = (until - Date.now()) / 1000;
     btn.textContent = `${reason} (${fmtWait(left)})`;
@@ -558,7 +597,11 @@ async function selectArticle(a) {
 
     body.innerHTML = html;
     body.querySelector(".title").innerHTML = titleHtml(data.title || a.title);
-    await loadList();
+    const i = state.articles.findIndex((x) => x.link === a.link);
+    if (i >= 0) state.articles[i] = { ...state.articles[i], ...data };
+    const list = $("list");
+    const sel = list.querySelector(".item.selected");
+    if (sel) sel.classList.add("read");
   } catch (e) {
     body.innerHTML = `<p class="muted">Nie udało się pobrać treści: ${e.message}</p>`;
   }
@@ -597,17 +640,6 @@ themeSel.onchange = () => {
   if (!["light", "dark", "sepia"].includes(mode)) mode = "sepia";
   applyTheme(mode);
 })();
-
-async function loadList() {
-  const url = new URL("/api/articles", location.origin);
-  url.searchParams.set("category", state.category);
-  url.searchParams.set("q", $("search").value.trim());
-  url.searchParams.set("sort", $("sort").value);
-  url.searchParams.set("unread", $("unread").checked);
-  const r = await fetch(url);
-  state.articles = await r.json();
-  renderList();
-}
 
 (async function init() {
   await loadCounts();
