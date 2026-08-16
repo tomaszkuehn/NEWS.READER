@@ -202,6 +202,34 @@ def _is_premium_card(card):
     return bool(card.select_one('[class*="PremiumLabel_"]'))
 
 
+def _clean_title(title_el):
+    """Tytuł z oddzielonymi labelami (np. 'W skrócie') od reszty tekstu.
+
+    Onet wstawia w element tytułu labele jako osobne spany
+    (ods-a-label-card / ods-a-content-label, np. 'W skrócie'). get_text()
+    skleilby je z tytułem bez spacji, dlatego wyciągamy je i poprzedzamy
+    nimi tytuł ze spacją.
+    """
+    if title_el is None:
+        return ""
+    clone = BeautifulSoup(str(title_el), "html.parser")
+    labels = []
+    for span in clone.select("span[class*='label-card'], span[class*='content-label']"):
+        txt = " ".join(span.get_text().split())
+        if txt:
+            labels.append(txt)
+        span.decompose()
+    title = " ".join(clone.get_text().split())
+    prefix = " ".join(labels)
+    return f"{prefix} {title}" if prefix else title
+
+
+def _card_title(card, a):
+    """Tytuł karty (h3 lub link) z labelami oddzielonymi spacją."""
+    h3 = card.find("h3") if card else None
+    return _clean_title(h3 or a)
+
+
 def extract_card_articles(soup, category):
     """Wyciąga artykuły z kart (a[data-uuid-ui]) — strona główna, feedy.
 
@@ -221,8 +249,7 @@ def extract_card_articles(soup, category):
         if card and _is_sponsored(card):
             continue
 
-        h3 = card.find("h3") if card else None
-        title = " ".join(h3.get_text().split()) if h3 else " ".join(a.get_text().split())
+        title = _card_title(card, a)
         if len(title) < 15:
             continue
 
@@ -262,7 +289,7 @@ def extract_article_tags(soup, category):
             continue
 
         h3 = art.find("h3") or a.find("h3")
-        title = " ".join(h3.get_text().split()) if h3 else " ".join(a.get_text().split())
+        title = _clean_title(h3 or a)
         if len(title) < 15:
             continue
         if _is_sponsored_title(title):
@@ -309,7 +336,7 @@ def scrape_category(category):
             if not _is_accept_domain(href, category):
                 continue
 
-            title = " ".join(a.get_text().split())
+            title = _clean_title(a)
             if len(title) < 15:
                 continue
             if _is_sponsored_title(title):

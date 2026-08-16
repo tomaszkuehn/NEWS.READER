@@ -72,6 +72,7 @@
     font-size: 12px; color: #fff;
   }
   .badge.read { background: var(--muted); }
+  .badge.prefix { background: var(--accent); font-size: 11px; vertical-align: middle; }
   .badge.cat { background: transparent; padding: 2px 0; font-weight: 600; color: var(--cat-color, var(--text)); }
   #empty { color: var(--muted); text-align: center; padding: 40px 0; }
   #loader { text-align: center; padding: 30px; color: var(--muted); }
@@ -160,6 +161,14 @@ const CAT_COLORS = {
   "podroze": "#00838f",
 };
 const catColor = (c) => CAT_COLORS[c] || "#6b7684";
+const PREFIX_RE = /^(W skrócie|Na żywo|Relacja na żywo|Wideo)\s+/i;
+
+function titleHtml(title) {
+  const m = title.match(PREFIX_RE);
+  if (!m) return title;
+  const rest = title.slice(m[0].length);
+  return `<span class="badge prefix">${m[1]}</span> ${rest}`;
+}
 
 let state = { category: "wszystkie", articles: [], counts: {} };
 
@@ -229,7 +238,7 @@ function renderList() {
       </div>`;
     const catB = el.querySelector(".badge.cat");
     catB.appendChild(document.createTextNode(a.category));
-    el.querySelector(".title").textContent = a.title;
+    el.querySelector(".title").innerHTML = titleHtml(a.title);
     el.onclick = () => openReader(a);
     list.appendChild(el);
   }
@@ -349,7 +358,7 @@ async function openReader(a) {
     html += contentMode.outerHTML;
 
     body.innerHTML = html;
-    body.querySelector(".title").textContent = data.title || a.title;
+    body.querySelector(".title").innerHTML = titleHtml(data.title || a.title);
     await loadList();
   } catch (e) {
     body.innerHTML = `<p class="muted">Nie udało się pobrać treści: ${e.message}</p>`;
