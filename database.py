@@ -1,9 +1,26 @@
 import os
+import sys
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "articles.db")
 RETENTION_DAYS = 7
+
+
+def get_data_dir():
+    """Katalog na dane aplikacji.
+
+    W wersji skompilowanej (PyInstaller) %APPDATA%\\NewsReader (katalog temp
+    onefile jest czyszczony przy zamknięciu), w trybie dev katalog projektu.
+    """
+    if getattr(sys, "frozen", False):
+        base = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "NewsReader")
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    os.makedirs(base, exist_ok=True)
+    return base
+
+
+DB_PATH = os.path.join(get_data_dir(), "articles.db")
 
 
 def now_iso():

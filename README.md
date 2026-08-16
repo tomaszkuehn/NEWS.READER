@@ -7,6 +7,7 @@ Prosty czytnik artykułów ze serwisów grupy Onet. Aplikacja okresowo scrapuje 
 - [Jak działa](#jak-działa)
 - [Wymagania i instalacja](#wymagania-i-instalacja)
 - [Uruchomienie](#uruchomienie)
+- [Aplikacja Windows (tray + instalator)](#aplikacja-windows-tray--instalator)
 - [API](#api)
 - [Throttling odświeżeń](#throttling-odświeżeń)
 - [Kategorie i źródła](#kategorie-i-źródła)
@@ -85,6 +86,52 @@ curl -X POST http://localhost:8000/api/refresh
 ```
 
 Baza jest inicjalizowana automatycznie przy starcie serwera.
+
+## Aplikacja Windows (tray + instalator)
+
+Oprócz uruchamiania z kodu można zbudować gotową aplikację dla **Windows 7 / 10 / 11**:
+
+- **`tray.py`** — launcher okienkowy: startuje serwer FastAPI w wątku i pokazuje ikonę
+  w zasobniku systemowym (pystray) z menu: otwórz czytnik, odśwież artykuły, folder danych,
+  wyjdź. Blokuje drugą instancję (mutex `Global\NewsReader.SingleInstance`) i loguje
+  do `%APPDATA%\NewsReader\news-reader.log`.
+- **Wersja spakowana (PyInstaller)** — wszystkie biblioteki wbudowane w jeden `NewsReader.exe`.
+  `index.html` jest rozpakowywany z archiwum (`sys._MEIPASS`), a baza `articles.db` i logi
+  trafiają do `%APPDATA%\NewsReader` — nie do katalogu temp onefile (który jest czyszczony
+  przy zamknięciu).
+- **Instalator (`NewsReader-Setup.exe`)** — budowany przenośnym NSIS. Instaluje aplikację
+  per-user (bez UAC) do `%LOCALAPPDATA%\NewsReader`, tworzy skróty w menu Start i na pulpicie,
+  oferuje autostart z systemem oraz odinstalator. Dane użytkownika (`%APPDATA%\NewsReader`)
+  są przy odinstalowaniu celowo zachowywane.
+
+### Budowanie dla Windows 7
+
+Windows 7 nie obsługuje Pythona ≥ 3.10, dlatego budowanie odbywa się z **przenośnego Pythona
+3.9** (wersja embed, bez instalacji). Wszystkie narzędzia budowania są przenośne — **nic nie
+jest instalowane w systemie**:
+
+1. Pobierz `python-3.9.13-embed-amd64.zip`, rozpakuj np. do `toolchain\py39` i włącz
+   `import site` w pliku `python39._pth`.
+2. Zainstaluj pip i zależności:
+   ```
+   python -m pip install -r requirements.txt pystray pillow pyinstaller
+   ```
+3. Wygeneruj ikonę: `python make_icon.py` (tworzy `app.ico`).
+4. Zbuduj exe:
+   ```
+   python -m PyInstaller newsreader.spec --noconfirm --clean --distpath dist --workpath build
+   ```
+   (wynik: `dist\NewsReader.exe` — wersja GUI, bez konsoli).
+5. Zbuduj instalator przenośnym NSIS:
+   ```
+   makensis.exe NewsReader.nsi
+   ```
+   (wynik: `dist\NewsReader-Setup.exe`).
+
+### Ręczne uruchomienie (bez instalatora)
+
+Skompilowany `NewsReader.exe` można uruchomić bezpośrednio — po chwili pojawi się ikona
+w tray i otworzy czytnik w domyślnej przeglądarce.
 
 ## API
 

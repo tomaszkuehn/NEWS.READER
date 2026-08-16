@@ -11,6 +11,10 @@ __pycache__/
 venv/
 env/
 
+# Build (PyInstaller / NSIS) — artefakty kompilacji
+build/
+dist/
+
 # Tooling IJFW (lokalna pamięć/wspomaganie)
 .ijfw/
 ijfw/

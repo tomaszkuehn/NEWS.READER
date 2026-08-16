@@ -1,4 +1,5 @@
 import os
+import sys
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,7 +8,12 @@ import database
 import onet_scraper
 import refresher
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# W wersji skompilowanej (PyInstaller onefile) pliki dodatkowe (index.html)
+# są rozpakowane do sys._MEIPASS; w dev używamy katalogu projektu.
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI(title="News Reader")
 
