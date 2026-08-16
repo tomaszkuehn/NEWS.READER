@@ -379,12 +379,24 @@ def _parse_published(html):
         m = re.search(r'"contentCreated"\s*:\s*"([^"]+)"', html)
     if not m:
         return ""
-    raw = m.group(1)
+    raw = _normalize_iso(m.group(1))
     try:
         dt = datetime.fromisoformat(raw)
     except ValueError:
         return ""
     return dt.astimezone(timezone.utc).isoformat()
+
+
+def _normalize_iso(raw):
+    """Ujednolica format ISO 8601 do formy akceptowanej przez fromisoformat.
+
+    Python < 3.11 odrzuca offset bez dwukropka (np. +0200) oraz sufiks 'Z' —
+    Onet zwraca właśnie +0200.
+    """
+    raw = raw.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    return re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", raw)
 
 
 def fetch_article_details(link):
