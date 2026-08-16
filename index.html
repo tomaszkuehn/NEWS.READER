@@ -174,6 +174,13 @@
   .item .meta { margin-top: 5px; display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
   .item.read .unread-dot { display: none; }
+  .heart-btn {
+    background: none; border: none; cursor: pointer; padding: 4px 6px;
+    font-size: 18px; line-height: 1; color: var(--muted); flex: none;
+    transition: transform .1s, color .12s;
+  }
+  .heart-btn:hover { transform: scale(1.2); }
+  .heart-btn.on { color: #e53935; }
   .badge {
     border-radius: 6px; padding: 2px 8px;
     font-size: 11.5px; font-weight: 600; white-space: nowrap;
@@ -267,6 +274,7 @@
       <option value="read">Przeczytane pierwsze</option>
     </select>
     <label class="check"><input type="checkbox" id="unread"> tylko nieprzeczytane</label>
+    <label class="check"><input type="checkbox" id="fav"> tylko ulubione</label>
     <button id="refresh" class="primary">Odśwież</button>
     <select id="theme" title="Wybierz styl aplikacji" aria-label="Wybierz styl aplikacji">
       <option value="light">Styl: czarny na białym</option>
@@ -433,6 +441,13 @@ function renderList() {
         </div>
       </div>`;
     el.querySelector(".title").innerHTML = titleHtml(a.title);
+    const heartBtn = document.createElement("button");
+    heartBtn.className = "heart-btn" + (a.is_favorite ? " on" : "");
+    heartBtn.innerHTML = a.is_favorite ? "♥" : "♡";
+    heartBtn.title = a.is_favorite ? "Usuń z ulubionych" : "Dodaj do ulubionych";
+    heartBtn.setAttribute("aria-label", heartBtn.title);
+    heartBtn.onclick = (e) => { e.stopPropagation(); toggleFavorite(a, heartBtn); };
+    el.appendChild(heartBtn);
     el.onclick = () => selectArticle(a);
     list.appendChild(el);
   }
@@ -452,6 +467,7 @@ async function loadArticles() {
   url.searchParams.set("q", $("search").value.trim());
   url.searchParams.set("sort", $("sort").value);
   url.searchParams.set("unread", $("unread").checked);
+  url.searchParams.set("favorite", $("fav").checked);
 
   try {
     const r = await fetch(url);
@@ -548,6 +564,34 @@ async function waitForRefresh(res) {
   await refresh();
 }
 
+/* ===== Ulubione ===== */
+async function toggleFavorite(a, btn) {
+  const fav = !a.is_favorite;
+  a.is_favorite = fav;
+  const i = state.articles.findIndex((x) => x.link === a.link);
+  if (i >= 0) state.articles[i].is_favorite = fav;
+  const setHeart = (el) => {
+    if (!el) return;
+    el.classList.toggle("on", fav);
+    el.innerHTML = fav ? "♥" : "♡";
+    el.title = fav ? "Usuń z ulubionych" : "Dodaj do ulubionych";
+    el.setAttribute("aria-label", el.title);
+  };
+  setHeart(btn);
+  if (state.selected === a.link) setHeart(document.querySelector("#preview-fav"));
+  try {
+    await fetch(`/api/articles/${encodeURIComponent(a.link)}/favorite?favorite=${fav}`, { method: "POST" });
+  } catch (e) { /* cichy błąd — oznaczenie pozostanie lokalne */ }
+  if ($("fav").checked && !fav) {
+    state.articles = state.articles.filter((x) => x.link !== a.link);
+    if (state.selected === a.link) {
+      state.selected = null;
+      renderPreview(null);
+    }
+    renderList();
+  }
+}
+
 /* ===== Podglad wybranego artykulu ===== */
 function renderPreview(a) {
   const body = $("preview-body");
@@ -588,6 +632,7 @@ async function selectArticle(a) {
         <span class="badge cat" style="color:${color}">${esc(catLabel(data.category || a.category))}</span>
         ${data.is_premium ? '<span class="badge premium">premium</span>' : ""}
         <span class="muted">${timeLabel}</span>
+        <button id="preview-fav" class="heart-btn${data.is_favorite ? " on" : ""}" title="${data.is_favorite ? "Usuń z ulubionych" : "Dodaj do ulubionych"}">${data.is_favorite ? "♥" : "♡"}</button>
       </div>`;
     if (data.published_at && isOlderThanWeek(data.published_at)) {
       html += `<div class="old-warning">Uwaga, wiadomość starsza niż 7 dni</div>`;
@@ -607,6 +652,8 @@ async function selectArticle(a) {
 
     body.innerHTML = html;
     body.querySelector(".title").innerHTML = titleHtml(data.title || a.title);
+    const favBtn = body.querySelector("#preview-fav");
+    if (favBtn) favBtn.onclick = () => toggleFavorite(data, favBtn);
     const i = state.articles.findIndex((x) => x.link === a.link);
     if (i >= 0) state.articles[i] = { ...state.articles[i], ...data };
     const list = $("list");
@@ -641,6 +688,7 @@ $("search").addEventListener("input", () => {
 });
 $("sort").addEventListener("change", loadArticles);
 $("unread").addEventListener("change", loadArticles);
+$("fav").addEventListener("change", loadArticles);
 $("refresh").addEventListener("click", refresh);
 
 /* ===== Wybor stylu aplikacji ===== */

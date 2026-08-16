@@ -64,6 +64,8 @@ def init_db():
         if "published_at" not in cols:
             conn.execute("ALTER TABLE articles ADD COLUMN published_at TEXT DEFAULT ''")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at)")
+        if "is_favorite" not in cols:
+            conn.execute("ALTER TABLE articles ADD COLUMN is_favorite INTEGER DEFAULT 0")
 
 
 def is_known(link):
@@ -122,7 +124,7 @@ def mark_read_and_store(link, details):
         )
 
 
-def get_articles(category=None, query=None, sort="newest", only_unread=False):
+def get_articles(category=None, query=None, sort="newest", only_unread=False, only_favorites=False):
     """Pobiera artykuły z filtrowaniem, wyszukiwaniem i sortowaniem."""
     sql = "SELECT * FROM articles WHERE 1=1"
     params = []
@@ -136,6 +138,8 @@ def get_articles(category=None, query=None, sort="newest", only_unread=False):
         params += [like, like]
     if only_unread:
         sql += " AND is_read = 0"
+    if only_favorites:
+        sql += " AND is_favorite = 1"
 
     sql += {
         "newest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) DESC",
@@ -155,9 +159,23 @@ def mark_read(link):
         conn.execute("UPDATE articles SET is_read = 1 WHERE link = ?", (link,))
 
 
+def set_favorite(link, is_favorite):
+    """Ustawia oznaczenie artykułu jako ulubionego (1/0)."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE articles SET is_favorite = ? WHERE link = ?",
+            (1 if is_favorite else 0, link),
+        )
+
+
 def cleanup_old():
-    """Usuwa artykuły nieaktualizowane dłużej niż RETENTION_DAYS dni."""
+    """Usuwa artykuły nieaktualizowane dłużej niż RETENTION_DAYS dni.
+
+    Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.
+    """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
     with _connect() as conn:
-        cur = conn.execute("DELETE FROM articles WHERE last_seen < ?", (cutoff,))
+        cur = conn.execute(
+            "DELETE FROM articles WHERE last_seen < ? AND is_favorite = 0", (cutoff,)
+        )
         return cur.rowcount

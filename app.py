@@ -46,8 +46,18 @@ def articles(
     q: str = Query(""),
     sort: str = Query("newest"),
     unread: bool = Query(False),
+    favorite: bool = Query(False),
 ):
-    return database.get_articles(category, q, sort, unread)
+    return database.get_articles(category, q, sort, unread, favorite)
+
+@app.post("/api/articles/{link:path}/favorite")
+def set_favorite(link: str, favorite: bool = Query(True)):
+    """Ustawia lub zdejmuje oznaczenie artykułu jako ulubionego."""
+    arts = database.get_articles()
+    if not any(a["link"] == link for a in arts):
+        raise HTTPException(404, "Artykuł nie istnieje")
+    database.set_favorite(link, favorite)
+    return {"link": link, "is_favorite": 1 if favorite else 0}
 
 @app.get("/api/articles/{link:path}/read")
 def read_article(link: str):

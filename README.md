@@ -150,8 +150,9 @@ w tray i otworzy czytnik w domyślnej przeglądarce.
 | GET | `/api/categories` | Lista kategorii |
 | POST | `/api/refresh` | Prosi o odświeżenie (z throttlingiem, zob. [Throttling odświeżeń](#throttling-odświeżeń)) |
 | GET | `/api/refresh/status` | Stan odświeżania (przerwa, limit/h, tryb, coverage) |
-| GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`) |
+| GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`, `favorite`) |
 | GET | `/api/articles/{link}/read` | Oznacza jako przeczytane i pobiera pełną treść |
+| POST | `/api/articles/{link}/favorite` | Ustawia/zdejmuje oznaczenie ulubionego (`favorite=true/false`) |
 | GET | `/api/health` | Status serwera |
 
 ## Throttling odświeżeń
@@ -241,7 +242,20 @@ Pomijane są następujące treści:
 
 6. **Linki, które nie są kartami artykułów** — generyczny skan linków (w `scrape_category`) akceptuje tylko linki wewnątrz `<article>` **lub** z atrybutem `data-uuid-ui` (unikalne ID karty). To odfiltrowuje podstrony serwisu, które przypadkiem pasują do wzorca URL (np. Onet Chat AI `/czat/konwersacja` „Zadaj własne pytanie", strona autorów `/autorzy/...`, prognoza pogody `/prognoza-pogody/dlugoterminowa`).
 
-7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`.
+7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`. **Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.**
+
+## Ulubione artykuły
+
+Artykuły można oznaczać jako ulubione — symbolem jest **serce** (♥/♡). Serce
+pojawia się na każdej karcie listy oraz w podglądzie artykułu. Filtry:
+
+- **„tylko ulubione"** — checkbox w pasku narzędzi pokazuje wyłącznie artykuły
+  oznaczone sercem (`/api/articles?favorite=true`).
+- **Retencja** — `cleanup_old()` pomija `is_favorite = 1`, więc ulubione
+  artykuły nigdy nie są automatycznie usuwane z bazy, nawet po upływie
+  `RETENTION_DAYS`.
+- Oznaczenie jest zapisywane w kolumnie `is_favorite` i przeżywają ponowne
+  skanowania (upsert nie nadpisuje tej kolumny).
 
 ## Kwalifikacja artykułów do grup (kategorii)
 
@@ -284,6 +298,7 @@ Plik: `articles.db` (SQLite). Tabela `articles`:
 | `lead` | TEXT | Lead artykułu (po otwarciu) |
 | `is_read` | INTEGER | 0/1 — przeczytane |
 | `is_premium` | INTEGER | 0/1 — artykuł premium |
+| `is_favorite` | INTEGER | 0/1 — ulubiony (nigdy nie usuwany automatycznie) |
 | `published_at` | TEXT | Data publikacji (ISO UTC — ze strony głównej `__NEXT_DATA__` lub po otwarciu artykułu) |
 | `first_seen` | TEXT | ISO — pierwsze wykrycie |
 | `last_seen` | TEXT | ISO — ostatnia aktualizacja |
