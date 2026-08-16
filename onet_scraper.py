@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timezone
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -329,6 +330,8 @@ def scrape_category(category):
             href = a["href"]
             if href in sponsored_hrefs:
                 continue
+            if a.find_parent("article") is None and not a.get("data-uuid-ui"):
+                continue
             m = ARTICLE_URL_RE.search(href)
             if not m:
                 continue
@@ -365,13 +368,32 @@ def extract_text(body):
     return "\n\n".join(parts)
 
 
+def _parse_published(html):
+    """Data publikacji z JSON-LD (datePublished) lub contentCreated.
+
+    Pobieramy ją z już pobranego HTML artykułu — bez dodatkowych requestów.
+    Zwraca ISO 8601 w UTC lub "".
+    """
+    m = re.search(r'"datePublished"\s*:\s*"([^"]+)"', html)
+    if not m:
+        m = re.search(r'"contentCreated"\s*:\s*"([^"]+)"', html)
+    if not m:
+        return ""
+    raw = m.group(1)
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return ""
+    return dt.astimezone(timezone.utc).isoformat()
+
+
 def fetch_article_details(link):
-    """Pobiera pełną treść, lead i główne zdjęcie artykułu ze strony."""
+    """Pobiera pełną treść, lead, główne zdjęcie i datę publikacji artykułu."""
     try:
         html = fetch_html(link)
         soup = BeautifulSoup(html, "html.parser")
     except requests.RequestException as e:
-        return {"error": f"Nie udało się pobrać: {e}", "content": "", "lead": "", "image": ""}
+        return {"error": f"Nie udało się pobrać: {e}", "content": "", "lead": "", "image": "", "published_at": ""}
 
     body = soup.select_one("article.ods-article-body") or soup.select_one("article")
     lead_el = soup.select_one("article.ods-article-lead")
@@ -381,4 +403,5 @@ def fetch_article_details(link):
         "content": extract_text(body) if body else "",
         "lead": lead_el.get_text(" ", strip=True) if lead_el else "",
         "image": image_el.get("content", "") if image_el else "",
+        "published_at": _parse_published(html),
     }

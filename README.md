@@ -183,7 +183,9 @@ Pomijane są następujące treści:
 
 5. **Artykuły z tytułem krótszym niż 15 znaków** — zwykle to etykiety, gry lub podstrony, nie artykuły.
 
-6. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`.
+6. **Linki, które nie są kartami artykułów** — generyczny skan linków (w `scrape_category`) akceptuje tylko linki wewnątrz `<article>` **lub** z atrybutem `data-uuid-ui` (unikalne ID karty). To odfiltrowuje podstrony serwisu, które przypadkiem pasują do wzorca URL (np. Onet Chat AI `/czat/konwersacja` „Zadaj własne pytanie", strona autorów `/autorzy/...`, prognoza pogody `/prognoza-pogody/dlugoterminowa`).
+
+7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`.
 
 ## Kwalifikacja artykułów do grup (kategorii)
 
@@ -226,10 +228,11 @@ Plik: `articles.db` (SQLite). Tabela `articles`:
 | `lead` | TEXT | Lead artykułu (po otwarciu) |
 | `is_read` | INTEGER | 0/1 — przeczytane |
 | `is_premium` | INTEGER | 0/1 — artykuł premium |
+| `published_at` | TEXT | Data publikacji (ISO UTC, po otwarciu artykułu) |
 | `first_seen` | TEXT | ISO — pierwsze wykrycie |
 | `last_seen` | TEXT | ISO — ostatnia aktualizacja |
 
-Migracje są wykonywane automatycznie w `init_db()` (`ALTER TABLE ... ADD COLUMN` dla brakujących kolumn `uuid` / `is_premium`), więc istniejąca baza jest aktualizowana bez utraty danych.
+Migracje są wykonywane automatycznie w `init_db()` (`ALTER TABLE ... ADD COLUMN` dla brakujących kolumn `uuid` / `is_premium` / `published_at`), więc istniejąca baza jest aktualizowana bez utraty danych.
 
 ## Implementacja
 
@@ -250,6 +253,21 @@ Bez UA Googlebota `www.onet.pl` zwraca pusty szkielet (strona renderowana po str
 ### Sortowanie i filtry w API
 
 `get_articles()` obsługuje: sortowanie (`newest`, `oldest`, `title`, `read`), wyszukiwanie po `title`/`summary` oraz filtr nieprzeczytanych.
+
+### Data publikacji artykułów
+
+Data publikacji (`published_at`) jest wyciągana z JSON-LD (`"datePublished"`) lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy po otwarciu artykułu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy otwarciu (`mark_read_and_store`). W interfejsie lista i podgląd pokazują datę publikacji; gdy jest nieznana, fallback do `last_seen`.
+
+### Style interfejsu
+
+Interfejs ma 3 style wybierane w headerze (zapamiętywane w `localStorage`):
+- **czarny na białym** (`light`),
+- **jasny na ciemnym** (`dark`),
+- **sepia / kremowy** (`sepia`, domyślny).
+
+### Menu kategorii
+
+Zakładki kategorii mają kolorowe kropki spójne z oznaczeniami artykułów; pozycja **Wszystkie** jest przesunięta na koniec (skrajne prawo).
 
 ## Znane ograniczenia
 

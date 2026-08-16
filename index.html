@@ -6,110 +6,239 @@
 <title>Onet Reader</title>
 <style>
   :root {
-    --bg: #f5f6f8;
+    --bg: #ffffff;
     --panel: #ffffff;
-    --border: #dde3ea;
-    --text: #1a1a1a;
-    --muted: #6b7684;
-    --accent: #0055ff;
+    --panel2: #f2f3f5;
+    --border: #dde0e4;
+    --text: #000000;
+    --muted: #555b66;
+    --accent: #1a5cf0;
+    --accent-soft: #e7efff;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.08);
+    --shadow-hover: 0 4px 14px rgba(0,0,0,.10);
     --font-ui: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
     --font-read: Georgia, "Times New Roman", serif;
   }
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --panel2: #f2f3f5;
+    --border: #dde0e4;
+    --text: #000000;
+    --muted: #555b66;
+    --accent: #1a5cf0;
+    --accent-soft: #e7efff;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.08);
+    --shadow-hover: 0 4px 14px rgba(0,0,0,.10);
+  }
+  [data-theme="sepia"] {
+    --bg: #faf7f0;
+    --panel: #fffdf7;
+    --panel2: #f1ede3;
+    --border: #e2dccb;
+    --text: #1a1a1a;
+    --muted: #6f6a5e;
+    --accent: #0055ff;
+    --accent-soft: #e8efff;
+    --shadow: 0 1px 2px rgba(40,35,20,.05), 0 1px 3px rgba(40,35,20,.06);
+    --shadow-hover: 0 4px 14px rgba(40,35,20,.09);
+  }
+  [data-theme="dark"] {
+    --bg: #12161d;
+    --panel: #1b212b;
+    --panel2: #232b37;
+    --border: #2c3542;
+    --text: #e8ecf2;
+    --muted: #98a2b3;
+    --accent: #4d8bff;
+    --accent-soft: #1e2c44;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.35);
+    --shadow-hover: 0 6px 18px rgba(0,0,0,.45);
+  }
   * { box-sizing: border-box; }
+  html { scrollbar-color: var(--border) transparent; }
   body {
     margin: 0;
     font-family: var(--font-ui);
     background: var(--bg);
     color: var(--text);
+    line-height: 1.5;
   }
+
+  /* ===== Header ===== */
   header {
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 0; z-index: 20;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
-  h1 { font-size: 20px; margin: 0; white-space: nowrap; color: var(--text); }
+  h1 { font-size: 19px; margin: 0; white-space: nowrap; font-weight: 700; letter-spacing: -.2px; }
   h1 .dot { color: var(--accent); }
-  .controls { display: flex; gap: 10px; align-items: center; flex: 1; flex-wrap: wrap; }
-  input[type=text], select {
-    background: var(--bg); color: var(--text);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 12px; font-size: 14px; outline: none; font-family: var(--font-ui);
+  .controls { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 260px; flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 150px; }
+  .search-wrap svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--muted); pointer-events: none;
   }
+  input[type=text], select {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid transparent; border-radius: 10px;
+    padding: 9px 12px; font-size: 14px; outline: none; font-family: var(--font-ui);
+    transition: border-color .15s, background .15s;
+  }
+  input[type=text] { width: 100%; padding-left: 32px; }
   input[type=text]:focus, select:focus { border-color: var(--accent); background: var(--panel); }
-  input[type=text] { flex: 1; min-width: 180px; }
+  select { cursor: pointer; }
+  .check {
+    display: flex; gap: 6px; align-items: center; cursor: pointer;
+    color: var(--muted); font-size: 13px; white-space: nowrap; user-select: none;
+  }
+  .check input { accent-color: var(--accent); width: 15px; height: 15px; }
   button {
-    background: var(--bg); color: var(--text);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 14px; cursor: pointer; font-size: 14px;
-    transition: background .15s; font-family: var(--font-ui);
+    background: var(--panel2); color: var(--text);
+    border: 1px solid transparent; border-radius: 10px;
+    padding: 9px 14px; cursor: pointer; font-size: 14px; font-weight: 500;
+    transition: background .15s, transform .1s; font-family: var(--font-ui);
   }
   button:hover { background: var(--border); }
-  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
-  .tabs { display: flex; gap: 6px; flex-wrap: wrap; overflow-x: auto; padding: 10px 16px 0; }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgba(0,85,255,.25); }
+  button.primary:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+  button.primary:disabled { opacity: .65; cursor: default; transform: none; }
+  button.icon-btn { padding: 9px 10px; line-height: 0; display: inline-flex; align-items: center; justify-content: center; }
+  button.icon-btn svg { width: 18px; height: 18px; }
+
+  /* ===== Tabs (kolorowe kategorie) ===== */
+  .tabs {
+    position: sticky; top: 60px; z-index: 15;
+    display: flex; gap: 6px; overflow-x: auto;
+    padding: 10px 16px; background: var(--bg);
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab {
     padding: 7px 14px; background: var(--panel); color: var(--muted);
-    border: 1px solid var(--border); border-bottom: none; border-radius: 10px 10px 0 0;
-    cursor: pointer; font-size: 14px; white-space: nowrap; font-family: var(--font-ui);
+    border: 1px solid var(--border); border-radius: 999px;
+    cursor: pointer; font-size: 13px; white-space: nowrap; font-family: var(--font-ui);
+    transition: all .15s;
+    display: inline-flex; align-items: center; gap: 6px;
   }
-  .tab.active { background: var(--panel); color: var(--accent); font-weight: 600; border-top: 2px solid var(--accent); }
-  .tab .count { opacity: .6; font-size: 12px; margin-left: 4px; }
-  main { padding: 16px; }
-  #list { display: flex; flex-direction: column; gap: 10px; }
+  .tab .cat-dot { width: 8px; height: 8px; margin: 0; flex: none; }
+  .tab:hover { border-color: var(--cat-color, var(--muted)); color: var(--cat-color, var(--text)); }
+  .tab.active {
+    background: var(--cat-color, var(--accent));
+    border-color: transparent;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--cat-color, var(--accent)) 40%, transparent);
+  }
+  .tab .count { opacity: .75; font-size: 11px; margin-left: 5px; font-weight: 500; }
+
+  /* ===== Layout: lista + podglad ===== */
+  main {
+    padding: 12px 16px 40px; max-width: 1500px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  #list {
+    display: flex; flex-direction: column; gap: 8px;
+    min-width: 0;
+  }
   .item {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    border-left: 6px solid var(--cat-color, var(--border));
-    padding: 14px 16px; cursor: pointer; transition: border-color .15s, transform .1s;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px; cursor: pointer;
+    box-shadow: var(--shadow);
+    border-left: 5px solid var(--cat-color, var(--border));
+    transition: transform .1s, box-shadow .12s, border-color .12s, background .12s;
   }
-  .item:hover { border-color: var(--text); transform: translateY(-1px); }
-  .item.read .title { color: var(--muted); text-decoration: line-through; }
-  .item .title { font-size: 16px; line-height: 1.4; }
-  .item .meta { margin-top: 8px; display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+  .item:hover { transform: translateX(2px); box-shadow: var(--shadow-hover); }
+  .item.selected { border-color: var(--cat-color, var(--accent)); background: var(--accent-soft); }
+  .item .main { flex: 1; min-width: 0; }
+  .item .title { font-size: 15px; font-weight: 600; line-height: 1.4; }
+  .item.read { opacity: .7; }
+  .item.read .title { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .item .meta { margin-top: 5px; display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  .item.read .unread-dot { display: none; }
   .badge {
-    background: var(--cat-color, var(--panel2));
     border-radius: 6px; padding: 2px 8px;
-    font-size: 12px; color: #fff;
+    font-size: 11.5px; font-weight: 600; white-space: nowrap;
   }
-  .badge.read { background: var(--muted); }
-  .badge.prefix { background: var(--accent); font-size: 11px; vertical-align: middle; }
-  .badge.cat { background: transparent; padding: 2px 0; font-weight: 600; color: var(--cat-color, var(--text)); }
-  #empty { color: var(--muted); text-align: center; padding: 40px 0; }
-  #loader { text-align: center; padding: 30px; color: var(--muted); }
+  .badge.cat { background: transparent; padding: 2px 0; font-weight: 700; color: var(--cat-color, var(--text)); }
+  .badge.premium { background: linear-gradient(135deg, #b8860b, #ffd700); color: #3a2d00; }
+  .badge.prefix { background: var(--accent); color: #fff; font-size: 11px; vertical-align: middle; }
+  #empty { color: var(--muted); text-align: center; padding: 60px 0; }
+  #loader { text-align: center; padding: 40px; color: var(--muted); }
   #spinner {
-    width: 28px; height: 28px; margin: 0 auto 10px;
+    width: 30px; height: 30px; margin: 0 auto 12px;
     border: 3px solid var(--border); border-top-color: var(--accent);
     border-radius: 50%; animation: spin .8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  /* czytnik */
-  #reader-overlay {
-    position: fixed; inset: 0; background: rgba(30,30,30,.5);
-    display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+
+  /* ===== Panel podgladu ===== */
+  #preview {
+    position: sticky; top: 122px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    max-height: calc(100vh - 140px);
+    display: flex; flex-direction: column;
+    overflow: hidden;
   }
-  #reader-overlay.open { display: flex; }
-  #reader {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-    max-width: 820px; width: 100%; max-height: 90vh; overflow-y: auto;
+  #preview-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
   }
-  #reader .topbar {
-    position: sticky; top: 0; background: var(--panel); padding: 12px 18px;
-    border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;
-  }
-  #reader .topbar a { color: var(--accent); font-size: 13px; }
-  #reader .close { background: none; border: none; color: var(--muted); font-size: 24px; cursor: pointer; }
-  #reader .body { padding: 24px 30px 32px; }
-  #reader .title { font-family: var(--font-read); font-size: 28px; line-height: 1.3; margin: 0 0 12px; color: var(--text); }
-  #reader .lead { color: var(--muted); font-size: 17px; line-height: 1.5; font-family: var(--font-read); margin-bottom: 18px; }
-  #reader img.hero { width: 100%; border-radius: 10px; margin-bottom: 20px; }
-  #reader .content {
-    font-family: var(--font-read);
-    font-size: 18px; line-height: 1.75; color: var(--text);
-    white-space: pre-wrap;
-  }
-  #reader .spinner-box { padding: 40px; text-align: center; color: var(--muted); }
+  #preview-head .title-mini { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #preview-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; display: none; }
+  #preview-body { padding: 18px 20px 26px; overflow-y: auto; }
+  #preview-body .title { font-family: var(--font-read); font-size: 24px; line-height: 1.3; margin: 0 0 12px; color: var(--text); max-width: 75ch; margin-left: auto; margin-right: auto; }
+  #preview-body .meta-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; max-width: 75ch; margin-left: auto; margin-right: auto; }
+  #preview-body .lead { color: var(--muted); font-size: 16px; line-height: 1.55; font-family: var(--font-read); margin-bottom: 16px; border-left: 3px solid var(--accent); padding-left: 14px; max-width: 75ch; margin-left: auto; margin-right: auto; }
+  #preview-body img.hero { width: 100%; border-radius: 10px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  #preview-body img.hero { width: 100%; border-radius: 10px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  #preview-body .content { font-family: var(--font-read); font-size: 17.5px; line-height: 1.8; color: var(--text); white-space: pre-wrap; max-width: 75ch; margin: 0 auto; }
+  #preview-body .spinner-box { padding: 40px; text-align: center; color: var(--muted); }
+  #preview-body .placeholder { color: var(--muted); text-align: center; padding: 60px 16px; font-size: 14px; }
+  #preview .topbar a { color: var(--accent); font-size: 13px; font-weight: 500; text-decoration: none; }
+  #preview .topbar a:hover { text-decoration: underline; }
+  #preview-orig { display: inline-block; margin: 14px auto 0; color: var(--accent); font-size: 13px; font-weight: 500; text-decoration: none; max-width: 75ch; }
+  #preview-orig:hover { text-decoration: underline; }
+
+  #refresh-note { text-align: center; color: var(--muted); font-size: 12.5px; padding: 4px 0 0; grid-column: 1 / -1; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 4px 16px 26px; }
   .muted { color: var(--muted); font-size: 13px; }
   .cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; }
+    #preview {
+      position: fixed; inset: 0; z-index: 40; max-height: none; border-radius: 0;
+      top: 0;
+      display: none;
+    }
+    #preview.open { display: flex; }
+    #preview-close { display: inline-block; }
+    #preview-head { position: sticky; top: 0; background: var(--panel); z-index: 2; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 10px 12px; gap: 8px; }
+    .tabs { top: 55px; padding: 8px 12px; }
+    main { padding: 10px 12px 30px; }
+    .controls { min-width: 100%; }
+    .search-wrap { order: 2; flex-basis: 100%; }
+    .check { order: 3; }
+    #refresh { order: 4; flex: 1; }
+    #theme { order: 5; }
+    .item { padding: 11px 13px; }
+  }
 </style>
 </head>
 <body>
@@ -117,36 +246,44 @@
 <header>
   <h1>Onet<span class="dot">.</span>Reader</h1>
   <div class="controls">
-    <input id="search" type="text" placeholder="Szukaj w tytułach..." autocomplete="off">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search" type="text" placeholder="Szukaj w tytułach..." autocomplete="off">
+    </div>
     <select id="sort">
       <option value="newest">Najnowsze</option>
       <option value="oldest">Najstarsze</option>
       <option value="title">Tytuł A-Z</option>
       <option value="read">Przeczytane pierwsze</option>
     </select>
-    <label class="muted" style="display:flex;gap:6px;align-items:center;">
-      <input type="checkbox" id="unread"> tylko nieprzeczytane
-    </label>
+    <label class="check"><input type="checkbox" id="unread"> tylko nieprzeczytane</label>
     <button id="refresh" class="primary">Odśwież</button>
+    <select id="theme" title="Wybierz styl aplikacji" aria-label="Wybierz styl aplikacji">
+      <option value="light">Styl: czarny na białym</option>
+      <option value="dark">Styl: jasny na ciemnym</option>
+      <option value="sepia">Styl: sepia (kremowy)</option>
+    </select>
   </div>
 </header>
 
 <nav class="tabs" id="tabs"></nav>
+<div id="refresh-note"></div>
 
 <main>
   <div id="list"></div>
   <div id="empty" style="display:none;">Brak artykułów.</div>
+  <aside id="preview">
+    <div id="preview-head">
+      <span class="title-mini">Podgląd</span>
+      <button id="preview-close" aria-label="Zamknij">✕</button>
+    </div>
+    <div id="preview-body">
+      <div class="placeholder">Wybierz artykuł z listy, aby zobaczyć podgląd.</div>
+    </div>
+  </aside>
 </main>
 
-<div id="reader-overlay">
-  <div id="reader">
-    <div class="topbar">
-      <a id="read-orig" href="#" target="_blank" rel="noopener">Oryginał ↗</a>
-      <button class="close" id="close-reader">✕</button>
-    </div>
-    <div class="body" id="reader-body"></div>
-  </div>
-</div>
+<footer>Onet Reader · dane pobierane z onet.pl</footer>
 
 <script>
 const CAT_COLORS = {
@@ -156,33 +293,40 @@ const CAT_COLORS = {
   "biznes": "#e65100",
   "kultura": "#7b1fa2",
   "technologie": "#00695c",
-  "inspiracje": "#f9a825",
+  "inspiracje": "#c77700",
   "motoryzacja": "#37474f",
   "podroze": "#00838f",
+  "glowna": "#6b7684",
 };
 const catColor = (c) => CAT_COLORS[c] || "#6b7684";
 const PREFIX_RE = /^(W skrócie|Na żywo|Relacja na żywo|Wideo)\s+/i;
 
-function titleHtml(title) {
-  const m = title.match(PREFIX_RE);
-  if (!m) return title;
-  const rest = title.slice(m[0].length);
-  return `<span class="badge prefix">${m[1]}</span> ${rest}`;
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[ch]));
 }
 
-let state = { category: "wszystkie", articles: [], counts: {} };
+function titleHtml(title) {
+  const m = title.match(PREFIX_RE);
+  if (!m) return esc(title);
+  const rest = title.slice(m[0].length);
+  return `<span class="badge prefix">${esc(m[1])}</span> ${esc(rest)}`;
+}
+
+let state = { category: "wszystkie", articles: [], counts: {}, selected: null };
 
 const CATS = [
-  ["wszystkie", "Wszystkie"],
-  ["najnowsze", "Najnowsze"],
-  ["wiadomosci", "Wiadomości"],
-  ["sport", "Sport"],
-  ["biznes", "Biznes"],
-  ["kultura", "Kultura"],
-  ["technologie", "Technologie"],
-  ["inspiracje", "Inspiracje"],
-  ["motoryzacja", "Motoryzacja"],
-  ["podroze", "Podróże"],
+  ["najnowsze", "Najnowsze", "#d32f2f"],
+  ["wiadomosci", "Wiadomości", "#1565c0"],
+  ["sport", "Sport", "#2e7d32"],
+  ["biznes", "Biznes", "#e65100"],
+  ["kultura", "Kultura", "#7b1fa2"],
+  ["technologie", "Technologie", "#00695c"],
+  ["inspiracje", "Inspiracje", "#c77700"],
+  ["motoryzacja", "Motoryzacja", "#37474f"],
+  ["podroze", "Podróże", "#00838f"],
+  ["wszystkie", "Wszystkie", "#6b7684"],
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -190,19 +334,31 @@ const $ = (id) => document.getElementById(id);
 function fmt(iso) {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleString("pl-PL", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-  });
+  if (isNaN(d.getTime())) return "";
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function articleTime(a) {
+  return fmt(a.published_at || a.last_seen);
+}
+
+function catLabel(key) {
+  const c = CATS.find(([k]) => k === key);
+  return c ? c[1] : key;
 }
 
 function renderTabs() {
   const t = $("tabs");
   t.innerHTML = "";
-  for (const [key, label] of CATS) {
+  for (const [key, label, color] of CATS) {
     const d = document.createElement("div");
     d.className = "tab" + (key === state.category ? " active" : "");
-    d.style.color = key === state.category ? catColor(key) : "";
-    d.textContent = label;
+    d.style.setProperty("--cat-color", color);
+    d.innerHTML = `<span class="cat-dot" style="background:${color}"></span><span class="tab-label">${esc(label)}</span>`;
     if (state.counts[key]) {
       const c = document.createElement("span");
       c.className = "count";
@@ -212,6 +368,8 @@ function renderTabs() {
     d.onclick = () => { state.category = key; loadArticles(); };
     t.appendChild(d);
   }
+  const active = t.querySelector(".tab.active");
+  if (active) active.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
 }
 
 function renderList() {
@@ -227,19 +385,20 @@ function renderList() {
   for (const a of state.articles) {
     const el = document.createElement("div");
     const color = catColor(a.category);
-    el.className = "item" + (a.is_read ? " read" : "");
+    el.className = "item" + (a.is_read ? " read" : "") + (state.selected === a.link ? " selected" : "");
     el.style.setProperty("--cat-color", color);
     el.innerHTML = `
-      <div class="title"></div>
-      <div class="meta">
-        <span class="badge cat"><span class="cat-dot" style="background:${color}"></span></span>
-        <span class="badge ${a.is_read ? "read" : ""}">${a.is_read ? "przeczytano" : "nowy"}</span>
-        <span>${fmt(a.last_seen)}</span>
+      <span class="unread-dot"></span>
+      <div class="main">
+        <div class="title"></div>
+        <div class="meta">
+          <span class="badge cat" style="color:${color}">${esc(catLabel(a.category))}</span>
+          ${a.is_premium ? '<span class="badge premium">premium</span>' : ""}
+          <span>${articleTime(a)}</span>
+        </div>
       </div>`;
-    const catB = el.querySelector(".badge.cat");
-    catB.appendChild(document.createTextNode(a.category));
     el.querySelector(".title").innerHTML = titleHtml(a.title);
-    el.onclick = () => openReader(a);
+    el.onclick = () => selectArticle(a);
     list.appendChild(el);
   }
 }
@@ -248,6 +407,8 @@ async function loadArticles() {
   const list = $("list");
   list.innerHTML = '<div id="loader"><div id="spinner"></div>Ładowanie...</div>';
   $("empty").style.display = "none";
+  state.selected = null;
+  renderPreview(null);
 
   const url = new URL("/api/articles", location.origin);
   url.searchParams.set("category", state.category);
@@ -278,12 +439,17 @@ async function loadCounts() {
   renderTabs();
 }
 
+function setNote(msg) {
+  $("refresh-note").textContent = msg || "";
+}
+
 async function refresh() {
   const btn = $("refresh");
   if (btn.dataset.busy) return;
   btn.dataset.busy = "1";
   btn.disabled = true;
   btn.textContent = "Pobieranie...";
+  setNote("Skanowanie serwisów Onetu…");
   try {
     const r = await fetch("/api/refresh", { method: "POST" });
     const res = await r.json();
@@ -295,10 +461,14 @@ async function refresh() {
       await waitForRefresh({ status: "waiting", wait_seconds: 0, reason: "Odświeżanie w toku" });
       return;
     }
+    const cov = res.result && res.result.coverage != null ? Math.round(res.result.coverage * 100) : null;
+    const covTxt = cov != null ? ` · zgodność z bazą ${cov}%` : "";
+    setNote(`Odświeżono ✓ ${covTxt}`);
     await loadCounts();
     await loadArticles();
     console.log("Odświeżono:", res);
   } catch (e) {
+    setNote("Błąd odświeżania");
     alert("Błąd odświeżania: " + e.message);
   } finally {
     btn.dataset.busy = "";
@@ -320,23 +490,44 @@ async function waitForRefresh(res) {
     ? "Limit odświeżeń na godzinę osiągnięty"
     : (res.reason || "Czekam na odświeżenie (min. 140 s)");
   btn.textContent = `${reason}...`;
+  setNote(reason + " — system poczeka i odświeży automatycznie");
   const until = Date.now() + (res.wait_seconds || 0) * 1000;
   while (Date.now() < until) {
     const left = (until - Date.now()) / 1000;
     btn.textContent = `${reason} (${fmtWait(left)})`;
+    setNote(`${reason} — odświeżenie za ${fmtWait(left)}`);
     await new Promise((r) => setTimeout(r, 500));
   }
-  // odświeżenie jest teraz dozwolone — spróbuj ponownie
   btn.dataset.busy = "";
   await refresh();
 }
 
-async function openReader(a) {
-  const overlay = $("reader-overlay");
-  const body = $("reader-body");
-  $("read-orig").href = a.link;
+/* ===== Podglad wybranego artykulu ===== */
+function renderPreview(a) {
+  const body = $("preview-body");
+  const head = $("preview-head");
+  const closeBtn = $("preview-close");
+  if (!a) {
+    head.querySelector(".title-mini").textContent = "Podgląd";
+    body.innerHTML = '<div class="placeholder">Wybierz artykuł z listy, aby zobaczyć podgląd.</div>';
+    closeBtn.style.display = "none";
+    return;
+  }
+  head.querySelector(".title-mini").textContent = a.category === "wszystkie" ? "Podgląd" : catLabel(a.category);
+  closeBtn.style.display = "inline-block";
   body.innerHTML = '<div class="spinner-box"><div id="spinner"></div>Pobieranie treści...</div>';
-  overlay.classList.add("open");
+}
+
+async function selectArticle(a) {
+  state.selected = a.link;
+  renderList();
+  renderPreview(a);
+  const preview = $("preview");
+  if (window.innerWidth <= 980) {
+    preview.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+  const body = $("preview-body");
 
   try {
     const r = await fetch(`/api/articles/${encodeURIComponent(a.link)}/read`);
@@ -344,8 +535,15 @@ async function openReader(a) {
     const data = await r.json();
     const d = data.details || {};
 
-    let html = `<h2 class="title"></h2>`;
-    if (d.image) html += `<img class="hero" src="${d.image}" alt="" onerror="this.style.display='none'">`;
+    const color = catColor(data.category || a.category);
+    const timeLabel = data.published_at ? `Opublikowano ${fmt(data.published_at)}` : fmt(data.last_seen || a.last_seen);
+    let html = `<h2 class="title"></h2>
+      <div class="meta-row">
+        <span class="badge cat" style="color:${color}">${esc(catLabel(data.category || a.category))}</span>
+        ${data.is_premium ? '<span class="badge premium">premium</span>' : ""}
+        <span class="muted">${timeLabel}</span>
+      </div>`;
+    if (d.image) html += `<img class="hero" src="${esc(d.image)}" alt="" onerror="this.style.display='none'">`;
     if (d.lead) {
       const leadMode = document.createElement("div");
       leadMode.className = "lead";
@@ -356,6 +554,7 @@ async function openReader(a) {
     contentMode.className = "content";
     contentMode.textContent = d.content || data.content || "(brak treści)";
     html += contentMode.outerHTML;
+    html += `<a id="preview-orig" href="${esc(a.link)}" target="_blank" rel="noopener">Oryginał ↗</a>`;
 
     body.innerHTML = html;
     body.querySelector(".title").innerHTML = titleHtml(data.title || a.title);
@@ -365,14 +564,39 @@ async function openReader(a) {
   }
 }
 
-$("close-reader").onclick = () => $("reader-overlay").classList.remove("open");
-$("reader-overlay").onclick = (e) => { if (e.target.id === "reader-overlay") $("reader-overlay").classList.remove("open"); };
+function closePreview() {
+  const preview = $("preview");
+  preview.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+$("preview-close").onclick = closePreview;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("preview").classList.contains("open")) closePreview();
+});
 
 let debounce;
 $("search").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(loadArticles, 250); });
 $("sort").addEventListener("change", loadArticles);
 $("unread").addEventListener("change", loadArticles);
 $("refresh").addEventListener("click", refresh);
+
+/* ===== Wybor stylu aplikacji ===== */
+const themeSel = $("theme");
+function applyTheme(mode) {
+  document.documentElement.setAttribute("data-theme", mode);
+  themeSel.value = mode;
+}
+themeSel.onchange = () => {
+  applyTheme(themeSel.value);
+  try { localStorage.setItem("onet-reader-theme", themeSel.value); } catch (e) {}
+};
+(function initTheme() {
+  let mode = "sepia";
+  try { mode = localStorage.getItem("onet-reader-theme") || "sepia"; } catch (e) {}
+  if (!["light", "dark", "sepia"].includes(mode)) mode = "sepia";
+  applyTheme(mode);
+})();
 
 async function loadList() {
   const url = new URL("/api/articles", location.origin);

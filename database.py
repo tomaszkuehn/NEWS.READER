@@ -31,6 +31,7 @@ def init_db():
                 lead        TEXT DEFAULT '',
                 is_read     INTEGER DEFAULT 0,
                 is_premium  INTEGER DEFAULT 0,
+                published_at TEXT DEFAULT '',
                 first_seen  TEXT NOT NULL,
                 last_seen   TEXT NOT NULL
             );
@@ -43,6 +44,9 @@ def init_db():
             conn.execute("ALTER TABLE articles ADD COLUMN uuid TEXT DEFAULT ''")
         if "is_premium" not in cols:
             conn.execute("ALTER TABLE articles ADD COLUMN is_premium INTEGER DEFAULT 0")
+        if "published_at" not in cols:
+            conn.execute("ALTER TABLE articles ADD COLUMN published_at TEXT DEFAULT ''")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at)")
 
 
 def is_known(link):
@@ -93,11 +97,11 @@ def mark_read_and_store(link, details):
         conn.execute(
             """
             UPDATE articles
-            SET is_read = 1, content = ?, image = ?, lead = ?
+            SET is_read = 1, content = ?, image = ?, lead = ?, published_at = COALESCE(NULLIF(?, ''), published_at)
             WHERE link = ?
             """,
             (details.get("content", ""), details.get("image", ""),
-             details.get("lead", ""), link),
+             details.get("lead", ""), details.get("published_at", ""), link),
         )
 
 
