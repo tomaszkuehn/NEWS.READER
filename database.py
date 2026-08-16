@@ -86,25 +86,25 @@ def upsert_article(article):
             # Nadpisuj kategorię tylko jeśli wiemy lepiej (konkretna zamiast 'glowna')
             if old_cat == "glowna" and new_cat != "glowna":
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, last_seen = ? WHERE link = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE link = ?",
                     (article.get("uuid", ""), article["title"], new_cat, article.get("image", ""),
-                     int(article.get("is_premium", 0)), now_iso(), article["link"]),
+                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), article["link"]),
                 )
             else:
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, last_seen = ? WHERE link = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE link = ?",
                     (article.get("uuid", ""), article["title"], article.get("image", ""),
-                     int(article.get("is_premium", 0)), now_iso(), article["link"]),
+                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), article["link"]),
                 )
         else:
             conn.execute(
                 """
-                INSERT INTO articles (link, uuid, title, category, image, is_premium, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO articles (link, uuid, title, category, image, is_premium, published_at, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (article["link"], article.get("uuid", ""), article["title"],
                  article["category"], article.get("image", ""),
-                 int(article.get("is_premium", 0)), now_iso(), now_iso()),
+                 int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), now_iso()),
             )
 
 

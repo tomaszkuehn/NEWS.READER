@@ -352,7 +352,7 @@ function fmt(iso) {
 }
 
 function articleTime(a) {
-  return fmt(a.last_seen);
+  return fmt(a.published_at || a.last_seen);
 }
 
 function catLabel(key) {

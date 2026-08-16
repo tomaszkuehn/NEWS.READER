@@ -305,7 +305,21 @@ Sortowanie `newest` i `read` opiera się na `last_seen` (momencie wykrycia artyk
 
 ### Data publikacji artykułów
 
-Data publikacji (`published_at`) jest wyciągana z JSON-LD (`"datePublished"`) lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy po otwarciu artykułu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy otwarciu (`mark_read_and_store`). W podglądzie pokazuje się ją data publikacji.
+Data publikacji (`published_at`) pochodzi z dwóch źródeł:
+
+1. **Strona główna Onetu** — podczas scrapowania `glowna` parsujemy payload
+   `__NEXT_DATA__` (JSON Next.js) i dopasowujemy pole `published` wpisów teaserów
+   do linków kart (URL `phoenixUrl` / `link.href`, dziedziczone z obiektu-rodzica).
+   Dzięki temu większość artykułów z strony głównej (~92%) ma datę od razu w liście,
+   bez otwierania.
+2. **Po otwarciu artykułu** — data jest wyciągana z JSON-LD (`"datePublished"`)
+   lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy
+   po otwarciu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy
+   otwarciu (`mark_read_and_store`) i uzupełnia artykuły, których nie było na
+   stronie głównej (np. z dedykowanych stron kategorii).
+
+W podglądzie oraz na liście pokazywana jest data publikacji, jeśli jest znana
+(inaczej czas wykrycia `last_seen`).
 
 ### Zachowanie podglądu podczas odświeżania
 

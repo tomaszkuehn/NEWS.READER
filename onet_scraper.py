@@ -1,3 +1,4 @@
+import json
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -143,6 +144,7 @@ def _merge_article(found, art):
 
     Jeśli ten sam link był już znaleziony w sekcji reklamowej (domyślnie
     'glowna'), a teraz wiemy, że należy do konkretnej kategorii, nadpisujemy.
+    Data publikacji jest uzupełniana, jeśli dopiero teraz ją poznaliśmy.
     """
     link = art["link"]
     if link not in found:
@@ -150,6 +152,9 @@ def _merge_article(found, art):
         return
     if found[link]["category"] == "glowna" and art["category"] != "glowna":
         found[link] = art
+        return
+    if not found[link].get("published_at") and art.get("published_at"):
+        found[link]["published_at"] = art["published_at"]
 
 
 def fetch_html(url, bot=False):
@@ -321,9 +326,11 @@ def scrape_category(category):
         except requests.RequestException:
             continue
         soup = BeautifulSoup(html, "html.parser")
+        dates = _parse_next_data_dates(html)
         sponsored_hrefs = _sponsored_hrefs(soup)
 
         for art in extract_article_tags(soup, category):
+            art["published_at"] = dates.get(art["link"], "")
             _merge_article(found, art)
 
         for a in soup.find_all("a", href=True):
@@ -351,6 +358,7 @@ def scrape_category(category):
                 "link": href,
                 "category": _section_category(a, category),
                 "is_premium": 1 if _is_premium_card(card) else 0,
+                "published_at": dates.get(href, ""),
             })
 
     return sorted(found.values(), key=lambda x: x["title"].lower())
@@ -379,12 +387,7 @@ def _parse_published(html):
         m = re.search(r'"contentCreated"\s*:\s*"([^"]+)"', html)
     if not m:
         return ""
-    raw = _normalize_iso(m.group(1))
-    try:
-        dt = datetime.fromisoformat(raw)
-    except ValueError:
-        return ""
-    return dt.astimezone(timezone.utc).isoformat()
+    return _to_utc_iso(m.group(1))
 
 
 def _normalize_iso(raw):
@@ -397,6 +400,65 @@ def _normalize_iso(raw):
     if raw.endswith("Z"):
         raw = raw[:-1] + "+00:00"
     return re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", raw)
+
+
+def _to_utc_iso(raw):
+    """Parsuje ISO 8601 i zwraca ujednolicone ISO w UTC (lub '' gdy błąd)."""
+    try:
+        dt = datetime.fromisoformat(_normalize_iso(raw))
+    except ValueError:
+        return ""
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _parse_next_data_dates(html):
+    """Mapa URL -> data publikacji ze strony głównej (payload __NEXT_DATA__).
+
+    Next.js wstrzykuje dane teaserów jako JSON; wpis artykułu ma pole
+    'published' oraz URL (phoenixUrl / href / link.href). Gdy wpis nie ma
+    własnego 'published', dziedziczymy go z najbliższego obiektu-rodzica.
+    Zwraca dict link -> ISO 8601 w UTC.
+    """
+    m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.S)
+    if not m:
+        return {}
+    try:
+        data = json.loads(m.group(1))
+    except ValueError:
+        return {}
+    dates = {}
+    stack = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            pushed = False
+            pub = o.get("published")
+            if isinstance(pub, str):
+                norm = _to_utc_iso(pub)
+                if norm:
+                    stack.append(norm)
+                    pushed = True
+            urls = []
+            for key in ("phoenixUrl", "href"):
+                v = o.get(key)
+                if isinstance(v, str) and ARTICLE_URL_RE.search(v):
+                    urls.append(v)
+            link = o.get("link")
+            if isinstance(link, dict) and isinstance(link.get("href"), str) and ARTICLE_URL_RE.search(link["href"]):
+                urls.append(link["href"])
+            if stack:
+                for u in urls:
+                    dates[u] = stack[-1]
+            for v in o.values():
+                walk(v)
+            if pushed:
+                stack.pop()
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(data)
+    return dates
 
 
 def fetch_article_details(link):
