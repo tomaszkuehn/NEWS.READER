@@ -270,20 +270,56 @@ async function loadCounts() {
 }
 
 async function refresh() {
-  $("refresh").disabled = true;
-  $("refresh").textContent = "Pobieranie...";
+  const btn = $("refresh");
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = "1";
+  btn.disabled = true;
+  btn.textContent = "Pobieranie...";
   try {
     const r = await fetch("/api/refresh", { method: "POST" });
     const res = await r.json();
+    if (res.status === "waiting" || res.status === "quota") {
+      await waitForRefresh(res);
+      return;
+    }
+    if (res.status === "refreshing") {
+      await waitForRefresh({ status: "waiting", wait_seconds: 0, reason: "Odświeżanie w toku" });
+      return;
+    }
     await loadCounts();
     await loadArticles();
     console.log("Odświeżono:", res);
   } catch (e) {
     alert("Błąd odświeżania: " + e.message);
   } finally {
-    $("refresh").disabled = false;
-    $("refresh").textContent = "Odśwież";
+    btn.dataset.busy = "";
+    btn.disabled = false;
+    btn.textContent = "Odśwież";
   }
+}
+
+function fmtWait(sec) {
+  const s = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m}m ${r}s` : `${r}s`;
+}
+
+async function waitForRefresh(res) {
+  const btn = $("refresh");
+  const reason = res.status === "quota"
+    ? "Limit odświeżeń na godzinę osiągnięty"
+    : (res.reason || "Czekam na odświeżenie (min. 140 s)");
+  btn.textContent = `${reason}...`;
+  const until = Date.now() + (res.wait_seconds || 0) * 1000;
+  while (Date.now() < until) {
+    const left = (until - Date.now()) / 1000;
+    btn.textContent = `${reason} (${fmtWait(left)})`;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // odświeżenie jest teraz dozwolone — spróbuj ponownie
+  btn.dataset.busy = "";
+  await refresh();
 }
 
 async function openReader(a) {

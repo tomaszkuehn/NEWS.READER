@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 import database
 import onet_scraper
+import refresher
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -13,6 +14,7 @@ app = FastAPI(title="Onet Reader")
 @app.on_event("startup")
 def startup():
     database.init_db()
+    refresher.start()
 
 @app.get("/")
 def index():
@@ -24,20 +26,13 @@ def categories():
 
 @app.post("/api/refresh")
 def refresh():
-    """Scrapuje wszystkie kategorie i zapisuje nowe artykuły."""
-    added = 0
-    errors = {}
-    for cat in onet_scraper.CATEGORIES:
-        try:
-            arts = onet_scraper.scrape_category(cat)
-            for a in arts:
-                database.upsert_article(a)
-            added += len(arts)
-        except Exception as e:
-            errors[cat] = str(e)
+    """Odświeża artykuły z throttlingiem (min. 140 s między odświeżeniami)."""
+    return refresher.refresh(trigger="user")
 
-    removed = database.cleanup_old()
-    return {"added": added, "errors": errors, "purged": removed}
+@app.get("/api/refresh/status")
+def refresh_status():
+    """Stan systemu odświeżania (throttling, quota, tryb, coverage)."""
+    return refresher.status()
 
 @app.get("/api/articles")
 def articles(

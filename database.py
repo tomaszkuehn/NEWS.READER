@@ -45,6 +45,14 @@ def init_db():
             conn.execute("ALTER TABLE articles ADD COLUMN is_premium INTEGER DEFAULT 0")
 
 
+def is_known(link):
+    """Czy artykuł o danym linku istnieje już w bazie."""
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT 1 FROM articles WHERE link = ?", (link,)
+        ).fetchone() is not None
+
+
 def upsert_article(article):
     """Zapisuje artykuł, jeśli nie istnieje (klucz = link). Odświeża last_seen."""
     with _connect() as conn:

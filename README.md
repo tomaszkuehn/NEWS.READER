@@ -8,6 +8,7 @@ Prosty czytnik artykułów ze serwisów grupy Onet. Aplikacja okresowo scrapuje 
 - [Wymagania i instalacja](#wymagania-i-instalacja)
 - [Uruchomienie](#uruchomienie)
 - [API](#api)
+- [Throttling odświeżeń](#throttling-odświeżeń)
 - [Kategorie i źródła](#kategorie-i-źródła)
 - [Jakie artykuły są zapisywane](#jakie-artykuły-są-zapisywane)
 - [Jakie artykuły są pomijane](#jakie-artykuły-są-pomijane)
@@ -26,21 +27,26 @@ Całość to trzy moduły:
    - `extract_article_tags()` — wyciąga artykuły z tagów `<article>` (wszystkie typy kart: StandardCard, LinkCard, SmallCard, BigCard, CartoonCard).
    - `fetch_article_details()` — pobiera treść artykułu po jego otwarciu.
 
-2. **`database.py`** — warstwa SQLite:
+2. **`refresher.py`** — throttling odświeżeń (min. 140 s, limit 15/h), coverage i automatyczny harmonogram w tle (co 10 min ± 15 s, potem co 1 h).
+
+3. **`database.py`** — warstwa SQLite:
    - `upsert_article()` — zapis/aktualizacja (dedup po `link`).
    - `get_articles()` — filtrowanie, wyszukiwanie, sortowanie.
    - `cleanup_old()` — usuwanie artykułów nieaktualizowanych dłużej niż `RETENTION_DAYS`.
 
-3. **`app.py`** — serwer FastAPI udostępniający API i statyczny frontend (`index.html`).
+4. **`app.py`** — serwer FastAPI udostępniający API i statyczny frontend (`index.html`).
 
 Przepływ:
 
 ```
-/ POST /api/refresh
-  for każda kategoria w CATEGORIES:
-      scrape_category(kategoria) -> lista artykułów
-      for każdy artykuł: upsert_article(artykuł)
-  cleanup_old()
+POST /api/refresh
+  (throttling: min. 140 s, limit 15/h) -> status waiting|quota|refreshing|ok
+  ok: for każda kategoria w CATEGORIES:
+          scrape_category(kategoria) -> lista artykułów
+          for każdy artykuł: upsert_article(artykuł)
+      cleanup_old()
+  coverage = znane / znalezione  (>=90% -> tryb slow)
+Wątek w tle: co 10 min ±15s (fast) albo co 1h (slow) wywołuje refresh(trigger="auto")
 ```
 
 Odświeżenie przechodzi przez **wszystkie** kategorie po kolei. Duplikaty są obsługiwane dwupoziomowo: w obrębie jednego scrapu (słownik kluczowany po `link`) oraz w bazie (klucz główny `link`).
@@ -86,10 +92,35 @@ Baza jest inicjalizowana automatycznie przy starcie serwera.
 |---|---|---|
 | GET | `/` | Frontend |
 | GET | `/api/categories` | Lista kategorii |
-| POST | `/api/refresh` | Scrapuje wszystkie kategorie, zapisuje nowe, czyści stare |
+| POST | `/api/refresh` | Prosi o odświeżenie (z throttlingiem, zob. [Throttling odświeżeń](#throttling-odświeżeń)) |
+| GET | `/api/refresh/status` | Stan odświeżania (przerwa, limit/h, tryb, coverage) |
 | GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`) |
 | GET | `/api/articles/{link}/read` | Oznacza jako przeczytane i pobiera pełną treść |
 | GET | `/api/health` | Status serwera |
+
+## Throttling odświeżeń
+
+Aby nie przeciążać serwerów Onetu (i nie narazić się na blokadę), odświeżanie jest
+ograniczane na trzy sposoby (`refresher.py`):
+
+1. **Minimalna przerwa między odświeżeniami: 140 s.** Odświeżenie na żądanie użytkownika
+   w krótszym odstępie nie wykonuje scrapera — odpowiedź `/api/refresh` ma wtedy status
+   `waiting` z liczbą sekund do upłynięcia przerwy, a interfejs pokazuje odliczanie
+   ("Czekam na odświeżenie… 2m 15s") i po jego zakończeniu automatycznie ponawia prośbę.
+
+2. **Limit 15 odświeżeń na godzinę** (okno przesuwne). Po jego wyczerpaniu odpowiedź ma
+   status `quota` z czasem oczekiwania do pierwszego wolnego miejsca w oknie.
+
+3. **Automatyczne odświeżanie w tle** (osobny wątek, startowany przy starcie serwera):
+   - dopóki **coverage < 90%** (czyli mniej niż 90% artykułów z Onetu jest już w bazie),
+     skanuje co **10 minut ± 15 s** (losowy jitter, żeby wzorzec nie był przewidywalny),
+   - po osiągnięciu **coverage ≥ 90%** przechodzi w tryb spokojny: co **1 godzinę**.
+   - Coverage liczony w trakcie samego skanowania (udział artykułów już obecnych w bazie
+     wśród wszystkich znalezionych) — bez drugiego scrapowania stron.
+
+Status odświeżania (`/api/refresh/status`) zwraca: aktualny tryb (`fast`/`slow`), ostatni
+coverage, czas do następnego dozwolonego odświeżenia (osobno dla przerwy i limitu godzinowego),
+liczbę odświeżeń w bieżącej godzinie.
 
 ## Kategorie i źródła
 
