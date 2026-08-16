@@ -3,6 +3,9 @@ articles.db
 *.db
 *.sqlite
 
+# Losowy identyfikator przeglądarki (generowany per-instalacja)
+browser_identity.txt
+
 # Python
 __pycache__/
 *.pyc

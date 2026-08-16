@@ -23,7 +23,7 @@ Prosty czytnik artykułów ze serwisów grupy Onet. Aplikacja okresowo scrapuje 
 Całość to trzy moduły:
 
 1. **`onet_scraper.py`** — pobiera strony i wyciąga artykuły:
-   - `fetch_html()` — pobiera HTML (z User-Agent Googlebota dla strony głównej, zob. [Strona główna Onetu](#strona-główna-onetu)).
+   - `fetch_html()` — pobiera HTML (z losowym User-Agent tej instalacji, zob. [Losowy identyfikator przeglądarki](#losowy-identyfikator-przeglądarki); dla strony głównej z UA Googlebota, zob. [Strona główna Onetu](#strona-główna-onetu)).
    - `scrape_category()` — główna pętla dla jednej kategorii; łączy ekstrakcję z tagów `<article>` z generycznym skanem wszystkich linków.
    - `extract_article_tags()` — wyciąga artykuły z tagów `<article>` (wszystkie typy kart: StandardCard, LinkCard, SmallCard, BigCard, CartoonCard).
    - `fetch_article_details()` — pobiera treść artykułu po jego otwarciu.
@@ -105,6 +105,13 @@ Oprócz uruchamiania z kodu można zbudować gotową aplikację dla **Windows 7 
   per-user (bez UAC) do `%LOCALAPPDATA%\NewsReader`, tworzy skróty w menu Start i na pulpicie,
   oferuje autostart z systemem oraz odinstalator. Dane użytkownika (`%APPDATA%\NewsReader`)
   są przy odinstalowaniu celowo zachowywane.
+- **Wykrywanie instalacji i aktualizacja (upgrade)** — instalator sprawdza w `.onInit`,
+  czy aplikacja jest już zainstalowana (klucz rejestru `Add/Remove Programs` +
+  istnienie `NewsReader.exe`). Jeśli tak: pyta o zgodę na aktualizację (w trybie cichym
+  `/S` aktualizuje automatycznie), zatrzymuje działającą aplikację (`taskkill`), nadpisuje
+  pliki i odświeża wersję w rejestrze. Katalog instalacji jest wczytywany z poprzedniego
+  wpisu rejestru. Dane użytkownika (artykuły, ustawienia, identyfikator przeglądarki)
+  pozostają nietknięte.
 
 ### Budowanie dla Windows 7
 
@@ -294,6 +301,17 @@ Artykuł premium jest oznaczany, gdy wewnątrz karty `<article>` znajduje się e
 Początkowo planowano filtrować materiały promocyjne po klasie `.SponsoringLabel_SponsoringLabelDesktop__43xKV`, ale:
 - Onet zmienia strukturę strony i te hashowane klasy znikają/zmieniają się,
 - dlatego detekcja opiera się na **tekście** (frazy *materiał promocyjny* itd.) i tytule, co jest odporne na zmiany layoutu.
+
+### Losowy identyfikator przeglądarki
+
+Każda instalacja przy pierwszym uruchomieniu losuje **losowy User-Agent** z puli
+realistycznych współczesnych przeglądarek (`USER_AGENT_POOL` w `onet_scraper.py`)
+i zapisuje go w `browser_identity.txt` w katalogu danych
+(`%APPDATA%\NewsReader` w wersji skompilowanej). Identyfikator jest **stały dla
+danej instalacji** (jak w prawdziwej przeglądarce) i **różny między instalacjami** —
+dzięki temu Onet nie widzi tego samego UA od wszystkich użytkowników, co utrudnia
+rozpoznanie i zablokowanie scrapera. Strona główna (`www.onet.pl`) nadal korzysta
+z UA Googlebota, bo tylko wtedy Onet serwuje pełny SSR.
 
 ### Dlaczego Googlebot dla strony głównej
 

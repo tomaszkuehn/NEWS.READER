@@ -1,11 +1,62 @@
 import json
+import os
+import random
 import re
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
+# Realistyczne User-Agenty współczesnych przeglądarek — każda instalacja
+# losuje jeden przy pierwszym uruchomieniu i trzyma go stabilnie.
+USER_AGENT_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.2592.87",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.2535.67",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+]
+
+
+def _data_dir():
+    try:
+        import database
+
+        return database.get_data_dir()
+    except ImportError:
+        return os.path.dirname(os.path.abspath(__file__))
+
+
+def browser_identity():
+    """Identyfikator przeglądarki (User-Agent) przypisany tej instalacji.
+
+    Losowany raz — przy pierwszym uruchomieniu po instalacji — i zapisywany
+    w katalogu danych. Dzięki temu jest stały dla danej instalacji (jak
+    w prawdziwej przeglądarce), a różny między instalacjami — co utrudnia
+    rozpoznanie i zablokowanie scrapera po stronie Onetu.
+    """
+    path = os.path.join(_data_dir(), "browser_identity.txt")
+    try:
+        with open(path, encoding="utf-8") as f:
+            ua = f.read().strip()
+        if ua:
+            return ua
+    except OSError:
+        pass
+    ua = random.choice(USER_AGENT_POOL)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(ua)
+    except OSError:
+        pass
+    return ua
+
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "User-Agent": browser_identity(),
 }
 
 # Strona główna jest renderowana przez JS dla zwykłych UA;
