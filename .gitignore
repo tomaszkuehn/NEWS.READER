@@ -1,0 +1,23 @@
+# Baza danych (lokalne dane, regenerowana przez /api/refresh)
+articles.db
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Tooling IJFW (lokalna pamięć/wspomaganie)
+.ijfw/
+ijfw/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
