@@ -9,7 +9,7 @@ import refresher
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = FastAPI(title="Onet Reader")
+app = FastAPI(title="News Reader")
 
 @app.on_event("startup")
 def startup():

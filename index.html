@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Onet Reader</title>
+<title>News Reader</title>
 <style>
   :root {
     --bg: #ffffff;
@@ -253,7 +253,7 @@
 <body>
 
 <header>
-  <h1>Onet<span class="dot">.</span>Reader</h1>
+  <h1>News<span class="dot">.</span>Reader</h1>
   <div class="controls">
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -292,7 +292,7 @@
   </aside>
 </main>
 
-<footer>Onet Reader · dane pobierane z onet.pl</footer>
+<footer>News Reader · dane pobierane z onet.pl</footer>
 
 <script>
 const CAT_COLORS = {
@@ -632,11 +632,11 @@ function applyTheme(mode) {
 }
 themeSel.onchange = () => {
   applyTheme(themeSel.value);
-  try { localStorage.setItem("onet-reader-theme", themeSel.value); } catch (e) {}
+  try { localStorage.setItem("news-reader-theme", themeSel.value); } catch (e) {}
 };
 (function initTheme() {
   let mode = "sepia";
-  try { mode = localStorage.getItem("onet-reader-theme") || "sepia"; } catch (e) {}
+  try { mode = localStorage.getItem("news-reader-theme") || "sepia"; } catch (e) {}
   if (!["light", "dark", "sepia"].includes(mode)) mode = "sepia";
   applyTheme(mode);
 })();

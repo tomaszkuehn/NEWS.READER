@@ -1,4 +1,4 @@
-# Onet Reader
+# News Reader
 
 Prosty czytnik artykułów ze serwisów grupy Onet. Aplikacja okresowo scrapuje strony Onetu i zapisuje wykryte artykuły do lokalnej bazy SQLite, a następnie udostępnia je przez interfejs WWW (FastAPI + prosty frontend).
 
