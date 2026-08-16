@@ -63,6 +63,8 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 fastapi==0.111.0
 uvicorn==0.30.1
+pystray==0.19.5
+pywin32==312
 ```
 
 ```bash
@@ -114,7 +116,7 @@ jest instalowane w systemie**:
    `import site` w pliku `python39._pth`.
 2. Zainstaluj pip i zależności:
    ```
-   python -m pip install -r requirements.txt pystray pillow pyinstaller
+   python -m pip install -r requirements.txt pillow pyinstaller
    ```
 3. Wygeneruj ikonę: `python make_icon.py` (tworzy `app.ico`).
 4. Zbuduj exe:
@@ -275,7 +277,7 @@ Plik: `articles.db` (SQLite). Tabela `articles`:
 | `lead` | TEXT | Lead artykułu (po otwarciu) |
 | `is_read` | INTEGER | 0/1 — przeczytane |
 | `is_premium` | INTEGER | 0/1 — artykuł premium |
-| `published_at` | TEXT | Data publikacji (ISO UTC, po otwarciu artykułu) |
+| `published_at` | TEXT | Data publikacji (ISO UTC — ze strony głównej `__NEXT_DATA__` lub po otwarciu artykułu) |
 | `first_seen` | TEXT | ISO — pierwsze wykrycie |
 | `last_seen` | TEXT | ISO — ostatnia aktualizacja |
 
@@ -301,7 +303,7 @@ Bez UA Googlebota `www.onet.pl` zwraca pusty szkielet (strona renderowana po str
 
 `get_articles()` obsługuje: sortowanie (`newest`, `oldest`, `title`, `read`), wyszukiwanie po `title`/`summary` oraz filtr nieprzeczytanych.
 
-Sortowanie `newest` i `read` opiera się na `last_seen` (momencie wykrycia artykułu w czytelniku), a nie na `published_at`. Dzięki temu otwarcie artykułu — które ustawia `published_at` — nie przemieszcza go w liście. Data publikacji jest zachowywana w bazie i wyświetlana w podglądzie.
+Sortowanie `newest` i `oldest` opiera się na dacie publikacji (`published_at`), z fallbackiem na `last_seen` dla artykułów bez znanej daty (`COALESCE(NULLIF(published_at, ''), last_seen)`). Dzięki temu lista jest układana wg rzeczywistej daty publikacji, a nie momentu wykrycia. Sortowanie `read` nadal używa `last_seen`, aby przeczytane artykuły pozostawały na górze.
 
 ### Data publikacji artykułów
 
@@ -312,14 +314,24 @@ Data publikacji (`published_at`) pochodzi z dwóch źródeł:
    do linków kart (URL `phoenixUrl` / `link.href`, dziedziczone z obiektu-rodzica).
    Dzięki temu większość artykułów z strony głównej (~92%) ma datę od razu w liście,
    bez otwierania.
-2. **Po otwarciu artykułu** — data jest wyciągana z JSON-LD (`"datePublished"`)
-   lub `contentCreated` w HTML artykułu — **z tej samej strony, którą już pobieramy
-   po otwarciu**, bez dodatkowych requestów do Onetu. Zapisuje się ją do bazy przy
+2. **Po otwarciu artykułu** — data jest wyciągana z HTML artykułu — **z tej samej strony, którą już pobieramy
+   po otwarciu**, bez dodatkowych requestów do Onetu. Źródła, sprawdzane w kolejności:
+   JSON-LD (`"datePublished"`), `"contentCreated"`, a na końcu element
+   `<time class="ods-m-date-authorship__publication">` (atrybut `datetime`) — ten ostatni
+   występuje w artykułach, które nie mają znaczników JSON-LD z datą. Zapisuje się ją do bazy przy
    otwarciu (`mark_read_and_store`) i uzupełnia artykuły, których nie było na
    stronie głównej (np. z dedykowanych stron kategorii).
 
 W podglądzie oraz na liście pokazywana jest data publikacji, jeśli jest znana
-(inaczej czas wykrycia `last_seen`).
+(inaczej czas wykrycia `last_seen`). W podglądzie data zawiera również rok
+(np. `08.10.2024, 11:20`).
+
+### Ostrzeżenie o starych artykułach
+
+Gdy data publikacji otwartego artykułu jest starsza niż **7 dni**, w podglądzie na górze
+treści pojawia się czerwony pasek **„Uwaga, wiadomość starsza niż 7 dni”**. To sygnał dla
+czytelnika, że wiadomość może być nieaktualna — czytnik pokazuje bowiem także stare treści
+z odświeżanych stron.
 
 ### Zachowanie podglądu podczas odświeżania
 

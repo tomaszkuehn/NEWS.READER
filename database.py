@@ -138,8 +138,8 @@ def get_articles(category=None, query=None, sort="newest", only_unread=False):
         sql += " AND is_read = 0"
 
     sql += {
-        "newest": " ORDER BY last_seen DESC",
-        "oldest": " ORDER BY first_seen ASC",
+        "newest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) DESC",
+        "oldest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) ASC",
         "title": " ORDER BY title COLLATE NOCASE ASC",
         "read": " ORDER BY is_read DESC, last_seen DESC",
     }.get(sort, " ORDER BY last_seen DESC")

@@ -209,6 +209,7 @@
   #preview-body .title { font-family: var(--font-read); font-size: 24px; line-height: 1.3; margin: 0 0 12px; color: var(--text); max-width: 75ch; margin-left: auto; margin-right: auto; }
   #preview-body .meta-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; max-width: 75ch; margin-left: auto; margin-right: auto; }
   #preview-body .lead { color: var(--muted); font-size: 16px; line-height: 1.55; font-family: var(--font-read); margin-bottom: 16px; border-left: 3px solid var(--accent); padding-left: 14px; max-width: 75ch; margin-left: auto; margin-right: auto; }
+  #preview-body .old-warning { background: #c62828; color: #fff; font-weight: 600; font-size: 13px; text-align: center; padding: 8px 14px; border-radius: 6px; margin: 0 auto 16px; max-width: 75ch; }
   #preview-body img.hero { width: 100%; border-radius: 10px; margin-bottom: 16px; box-shadow: var(--shadow); }
   #preview-body img.hero { width: 100%; border-radius: 10px; margin-bottom: 16px; box-shadow: var(--shadow); }
   #preview-body .content { font-family: var(--font-read); font-size: 17.5px; line-height: 1.8; color: var(--text); white-space: pre-wrap; max-width: 75ch; margin: 0 auto; }
@@ -348,11 +349,17 @@ function fmt(iso) {
   if (d.toDateString() === today.toDateString()) {
     return d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
   }
-  return d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function articleTime(a) {
   return fmt(a.published_at || a.last_seen);
+}
+
+function isOlderThanWeek(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  return d.getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000;
 }
 
 function catLabel(key) {
@@ -582,6 +589,9 @@ async function selectArticle(a) {
         ${data.is_premium ? '<span class="badge premium">premium</span>' : ""}
         <span class="muted">${timeLabel}</span>
       </div>`;
+    if (data.published_at && isOlderThanWeek(data.published_at)) {
+      html += `<div class="old-warning">Uwaga, wiadomość starsza niż 7 dni</div>`;
+    }
     if (d.image) html += `<img class="hero" src="${esc(d.image)}" alt="" onerror="this.style.display='none'">`;
     if (d.lead) {
       const leadMode = document.createElement("div");

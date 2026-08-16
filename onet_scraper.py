@@ -386,6 +386,11 @@ def _parse_published(html):
     if not m:
         m = re.search(r'"contentCreated"\s*:\s*"([^"]+)"', html)
     if not m:
+        m = re.search(
+            r'<time[^>]+class="[^"]*ods-m-date-authorship__publication[^"]*"[^>]*\sdatetime="([^"]+)"',
+            html,
+        )
+    if not m:
         return ""
     return _to_utc_iso(m.group(1))
 
