@@ -619,7 +619,16 @@ document.addEventListener("keydown", (e) => {
 });
 
 let debounce;
-$("search").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(loadArticles, 250); });
+$("search").addEventListener("input", () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
+    if ($("search").value.trim() && state.category !== "wszystkie") {
+      state.category = "wszystkie";
+      renderTabs();
+    }
+    loadArticles();
+  }, 250);
+});
 $("sort").addEventListener("change", loadArticles);
 $("unread").addEventListener("change", loadArticles);
 $("refresh").addEventListener("click", refresh);
