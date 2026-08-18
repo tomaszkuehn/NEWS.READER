@@ -283,6 +283,10 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
   **treść podglądu** (`#preview-body`) mają własne pionowe scrolle;
   nagłówek, pasek kategorii i stopka są nieruchome. Na wąskich ekranach
   (≤980px) podgląd staje się pełnoekranowym modalem (`position: fixed`).
+- **Paski przewijania** — półprzezroczysty jasny track
+  (`rgba(255,255,255,.35)`) z ciemniejszym thumb (`rgba(0,0,0,.50)`),
+  niezależny od motywu — widoczny zarówno na zwykłym tle, jak i na
+  zdjęciu w tle. Thumb jest szerszy (10px) z `padding-box` clip.
 - **Pasek kategorii** — zakładki **zawijają się** do kolejnych rzędów
   (`flex-wrap`), więc wszystkie kategorie są zawsze widoczne — bez scrolla
   ani strzałek. Aktywna zakładka jest przewijana do widoku po przebudowie.
