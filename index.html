@@ -123,26 +123,11 @@
   button.icon-btn svg { width: 18px; height: 18px; }
 
   /* ===== Tabs (kolorowe kategorie) ===== */
-  .tabs-wrap { flex: none; position: relative; background: var(--bg); }
+  .tabs-wrap { flex: none; background: var(--bg); }
   .tabs {
-    display: flex; gap: 6px; overflow-x: auto;
+    display: flex; flex-wrap: wrap; gap: 6px;
     padding: 10px 16px; background: var(--bg);
-    scrollbar-width: none;
   }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab-arrow {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%;
-    background: var(--panel); box-shadow: var(--shadow);
-    color: var(--text); font-size: 16px; line-height: 1; cursor: pointer;
-    display: none; align-items: center; justify-content: center; z-index: 2;
-    transition: background .15s, opacity .15s;
-  }
-  .tab-arrow:hover { background: var(--panel2); }
-  .tab-arrow.left { left: 4px; }
-  .tab-arrow.right { right: 4px; }
-  .tabs-wrap.scrollable-left .tab-arrow.left { display: flex; }
-  .tabs-wrap.scrollable-right .tab-arrow.right { display: flex; }
   .tab {
     padding: 7px 14px; background: var(--panel); color: var(--muted);
     border: 1px solid var(--border); border-radius: 999px;
@@ -311,11 +296,7 @@
   </div>
 </header>
 
-<div class="tabs-wrap" id="tabs-wrap">
-  <button class="tab-arrow left" id="tab-left" type="button" aria-label="Przewiń kategorie w lewo">‹</button>
-  <nav class="tabs" id="tabs"></nav>
-  <button class="tab-arrow right" id="tab-right" type="button" aria-label="Przewiń kategorie w prawo">›</button>
-</div>
+<div class="tabs-wrap"><nav class="tabs" id="tabs"></nav></div>
 <div id="refresh-note"></div>
 
 <main>
@@ -423,28 +404,8 @@ function renderTabs() {
     d.onclick = () => { state.category = key; renderTabs(); loadArticles(); };
     t.appendChild(d);
   }
-  const tabs = $("tabs");
-  const active = tabs.querySelector(".tab.active");
-  if (active) {
-    const t = tabs.getBoundingClientRect();
-    const a = active.getBoundingClientRect();
-    tabs.scrollLeft += a.left - t.left - (t.width - a.width) / 2;
-  }
-  updateTabArrows();
+  scrollSelectedIntoView();
 }
-
-function updateTabArrows() {
-  const t = $("tabs");
-  const w = $("tabs-wrap");
-  const sl = t.scrollLeft, max = t.scrollWidth - t.clientWidth - 1;
-  w.classList.toggle("scrollable-left", sl > 1);
-  w.classList.toggle("scrollable-right", sl < max);
-}
-
-$("tabs").addEventListener("scroll", updateTabArrows);
-$("tab-left").addEventListener("click", () => { $("tabs").scrollBy({ left: -200, behavior: "smooth" }); });
-$("tab-right").addEventListener("click", () => { $("tabs").scrollBy({ left: 200, behavior: "smooth" }); });
-window.addEventListener("resize", updateTabArrows);
 
 function scrollSelectedIntoView() {
   const list = $("list");

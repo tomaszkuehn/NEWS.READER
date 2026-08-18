@@ -283,9 +283,9 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
   **treść podglądu** (`#preview-body`) mają własne pionowe scrolle;
   nagłówek, pasek kategorii i stopka są nieruchome. Na wąskich ekranach
   (≤980px) podgląd staje się pełnoekranowym modalem (`position: fixed`).
-- **Pasek kategorii** — poziomo przewijalny; gdy kategorii jest więcej niż
-  zmieści ekran, po bokach pojawiają się **strzałki ‹ ›** (klik = płynne
-  przewinięcie). Aktywna zakładka jest automatycznie centrowana.
+- **Pasek kategorii** — zakładki **zawijają się** do kolejnych rzędów
+  (`flex-wrap`), więc wszystkie kategorie są zawsze widoczne — bez scrolla
+  ani strzałek. Aktywna zakładka jest przewijana do widoku po przebudowie.
 - **Wyszukiwanie** — pole z ikoną lupy i przyciskiem **×** (pojawia się gdy jest
   wpisany tekst); kliknięcie czyści pole i przeładowuje listę. Wyszukiwanie
   odbywa się tylko w artykułach nieukrytych (zgodnie z filtrami, w tym
