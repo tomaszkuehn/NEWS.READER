@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 
 import app as server_app
 import database
+import license
 import refresher
 
 APP_NAME = "News Reader"
@@ -114,6 +115,8 @@ def _make_icon_image():
 
 def _trigger_refresh():
     try:
+        if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+            return
         refresher.refresh(trigger="user")
     except Exception:
         pass

@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 import database
+import license
 import onet_scraper
 
 # ---- konfiguracja throttlingu ----
@@ -137,6 +138,12 @@ def _auto_loop():
         else:
             cadence = SLOW_CADENCE_SECONDS + random.uniform(-60, 60)
         time.sleep(max(cadence, 1))
+        # Nie scrapuj, gdy baza osiągnęła limit i nie wprowadzono klucza.
+        try:
+            if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+                continue
+        except Exception:
+            pass
         refresh(trigger="auto")
 
 

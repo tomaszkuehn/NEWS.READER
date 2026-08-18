@@ -90,6 +90,12 @@ def is_known(link):
         ).fetchone() is not None
 
 
+def count_articles():
+    """Zwraca liczbę artykułów w bazie."""
+    with _connect() as conn:
+        return conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+
+
 def get_article_by_key(link):
     """Pobiera wiersz artykułu po article_key (ignoruje filtry hide_stale/kategoria)."""
     with _connect() as conn:

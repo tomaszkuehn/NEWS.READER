@@ -300,6 +300,35 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
   w nagłówku jako frosted glass z `backdrop-filter: blur`, w stopce);
   panele treści (lista, podgląd) pozostają nieprzezroczyste dla
   czytelności. Przycisk **„Bez tła"** usuwa tło i czyści `localStorage`.
+- **Czas odświeżenia** — po odświeżeniu w pasku pod kategoriami pojawia się
+  „Odświeżono ✓ (X min temu)"; licznik jest aktualizowany co 30 s.
+- **Stopka** — zawiera informację o prawach autorskich: „(C) Tomasz Kuehn 2026".
+
+## Limit artykułów i klucz odblokowujący
+
+Gdy baza osiągnie **4000 artykułów**, dalsze pobieranie z Onetu jest
+blokowane — ręczne (`/api/refresh`) i automatyczne (pętla `refresher`).
+W menu na górze strony pojawia się przycisk **„Wprowadź klucz"** (pulsujący),
+który otwiera modal z **kodem systemu** (stabilny identyfikator maszyny,
+wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu).
+
+Aby odblokować aplikację, należy:
+
+1. Odczytać kod systemu z modala.
+2. Wygenerować klucz osobnym narzędziem **`keygen.py`**:
+   ```
+   python keygen.py <kod_systemu>
+   ```
+3. Wpisać zwrócony klucz w polu modala i potwierdzić.
+
+Klucz jest weryfikowany po stronie aplikacji (`license.verify`) — powiązanie
+z kodem systemu sprawia, że klucz jest ważny tylko na tej maszynie.
+Poprawny klucz jest zapisywany w pliku `.unlock` (katalog danych aplikacji,
+`%APPDATA%\NewsReader` w wersji instalacyjnej) i przeżywa restarty.
+
+Mechanizm weryfikacji jest celowo zaciemniony (stałe sekretu nie występują
+jako literały, funkcje mają mylące nazwy, porównanie przez HMAC) — utrudnia
+to analizę kodu aplikacji w celu ominięcia zabezpieczenia.
 
 ## Ulubione artykuły
 

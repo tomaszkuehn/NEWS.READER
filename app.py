@@ -3,8 +3,10 @@ import sys
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 import database
+import license
 import onet_scraper
 import refresher
 
@@ -32,9 +34,35 @@ def index():
 def categories():
     return list(onet_scraper.CATEGORIES.keys())
 
+@app.get("/api/status")
+def system_status():
+    """Stan licencji: licznik artykułów, blokada, kod systemu."""
+    count = database.count_articles()
+    unlocked = license.is_unlocked()
+    locked = count >= license.LIMIT and not unlocked
+    return {
+        "article_count": count,
+        "limit": license.LIMIT,
+        "locked": locked,
+        "unlocked": unlocked,
+        "system_code": license.system_code() if locked else None,
+    }
+
+class UnlockReq(BaseModel):
+    key: str
+
+@app.post("/api/unlock")
+def unlock(req: UnlockReq):
+    if license.verify(license.system_code(), req.key):
+        license.store_key(req.key)
+        return {"ok": True, "unlocked": True}
+    raise HTTPException(403, "Nieprawidłowy klucz")
+
 @app.post("/api/refresh")
 def refresh():
     """Odświeża artykuły z throttlingiem (min. 140 s między odświeżeniami)."""
+    if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+        raise HTTPException(403, "Osiągnięto limit artykułów — wprowadź klucz, aby kontynuować")
     return refresher.refresh(trigger="user")
 
 @app.get("/api/refresh/status")
