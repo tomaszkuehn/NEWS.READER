@@ -1,0 +1,9 @@
+feedparser==6.0.11
+requests==2.32.3
+beautifulsoup4==4.12.3
+fastapi==0.100.1
+uvicorn==0.23.2
+pystray==0.19.5
+pywin32==305
+cryptography==38.0.4
+pyinstaller==5.13.2

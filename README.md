@@ -91,7 +91,8 @@ Baza jest inicjalizowana automatycznie przy starcie serwera.
 
 ## Aplikacja Windows (tray + instalator)
 
-Oprócz uruchamiania z kodu można zbudować gotową aplikację dla **Windows 7 / 10 / 11**:
+Oprócz uruchamiania z kodu można zbudować gotową aplikację dla **Windows 10 / 11**
+oraz osobną wersję dla **Windows 7**:
 
 - **`tray.py`** — launcher okienkowy: startuje serwer FastAPI w wątku i pokazuje ikonę
   w zasobniku systemowym (pystray) z menu: otwórz czytnik, odśwież artykuły, folder danych,
@@ -113,29 +114,45 @@ Oprócz uruchamiania z kodu można zbudować gotową aplikację dla **Windows 7 
   wpisu rejestru. Dane użytkownika (artykuły, ustawienia, identyfikator przeglądarki)
   pozostają nietknięte.
 
-### Budowanie dla Windows 7
+### Dwa instalatory
 
-Windows 7 nie obsługuje Pythona ≥ 3.10, dlatego budowanie odbywa się z **przenośnego Pythona
-3.9** (wersja embed, bez instalacji). Wszystkie narzędzia budowania są przenośne — **nic nie
-jest instalowane w systemie**:
+| Instalator | Stack | Cel | Rozmiar |
+|---|---|---|---|
+| `NewsReader-Setup.exe` | Python 3.12 + najnowsze biblioteki | Windows 10/11 | ~46 MB |
+| `NewsReader-win7-Setup.exe` | Python 3.8 + starsze biblioteki | Windows 7+ | ~21 MB |
 
-1. Pobierz `python-3.9.13-embed-amd64.zip`, rozpakuj np. do `toolchain\py39` i włącz
-   `import site` w pliku `python39._pth`.
-2. Zainstaluj pip i zależności:
-   ```
-   python -m pip install -r requirements.txt pillow pyinstaller
-   ```
-3. Wygeneruj ikonę: `python make_icon.py` (tworzy `app.ico`).
-4. Zbuduj exe:
-   ```
-   python -m PyInstaller newsreader.spec --noconfirm --clean --distpath dist --workpath build
-   ```
-   (wynik: `dist\NewsReader.exe` — wersja GUI, bez konsoli).
-5. Zbuduj instalator przenośnym NSIS:
-   ```
-   makensis.exe NewsReader.nsi
-   ```
-   (wynik: `dist\NewsReader-Setup.exe`).
+Wersja Win7 jest budowana z osobnego venv (`venv-win7`) z `requirements-win7.txt`
+(starsze wersje `cryptography`, `pywin32`, `pyinstaller`). Kod aplikacji jest
+współdzielony — nie ma osobnego źródła dla Win7. Obie wersje instalują się
+obok siebie (osobne katalogi, osobne klucze rejestru, wspólny `%APPDATA%\NewsReader`).
+
+### Budowanie — Windows 10/11 (główny instalator)
+
+Wymaga Pythona 3.12 na maszynie budującej:
+
+```
+pip install -r requirements.txt
+pyinstaller --clean --noconfirm newsreader.spec
+"C:\Program Files (x86)\NSIS\makensis.exe" NewsReader.nsi
+```
+
+Wynik: `dist\NewsReader-Setup.exe`.
+
+### Budowanie — Windows 7 (osobny instalator)
+
+Wymaga **Pythona 3.8** zainstalowanego obok 3.12 (py-launcher wybiera wersję):
+
+```
+py -3.8 -m venv venv-win7
+venv-win7\Scripts\pip install -r requirements-win7.txt
+build-win7.bat
+```
+
+`build-win7.bat` uruchamia PyInstaller z `venv-win7` i buduje instalator
+przez `NewsReader-win7.nsi`. Wynik: `dist\NewsReader-win7-Setup.exe`.
+
+Instalator Win7 weryfikuje w `.onInit` że system to Windows 7 lub nowszy
+(`${AtLeastWin7}` z `WinVer.nsh`) — na starszych (Vista/XP) odmawia instalacji.
 
 ### Ręczne uruchomienie (bez instalatora)
 

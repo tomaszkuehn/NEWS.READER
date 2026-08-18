@@ -17,6 +17,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+venv-win7/
 env/
 
 # Build (PyInstaller / NSIS) — artefakty kompilacji
