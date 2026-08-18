@@ -69,6 +69,21 @@
     height: 100vh;
     overflow: hidden;
   }
+  body.has-bg {
+    background-image: var(--bg-image);
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+  body.has-bg header {
+    background: color-mix(in srgb, var(--panel) 80%, transparent);
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  }
+  body.has-bg .tabs-wrap,
+  body.has-bg .tabs { background: transparent; }
+  body.has-bg #refresh-note { background: transparent; }
 
   /* ===== Header ===== */
   header {
@@ -293,6 +308,11 @@
       <option value="dark">Styl: jasny na ciemnym</option>
       <option value="sepia">Styl: sepia (kremowy)</option>
     </select>
+    <input type="file" id="bg-file" accept="image/*" style="display:none">
+    <button id="bg-btn" class="icon-btn" type="button" title="Wybierz zdjęcie jako tło strony" aria-label="Wybierz zdjęcie jako tło strony">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L6 21"/></svg>
+    </button>
+    <button id="bg-clear" type="button" title="Wyczyść tło strony" aria-label="Wyczyść tło strony" style="display:none">Bez tła</button>
   </div>
 </header>
 
@@ -730,6 +750,64 @@ themeSel.onchange = () => {
   try { mode = localStorage.getItem("news-reader-theme") || "sepia"; } catch (e) {}
   if (!["light", "dark", "sepia"].includes(mode)) mode = "sepia";
   applyTheme(mode);
+})();
+
+/* ===== Tlo strony (zdjecie uzytkownika) ===== */
+const bgFileInput = $("bg-file");
+const bgBtn = $("bg-btn");
+const bgClearBtn = $("bg-clear");
+function applyBg(dataUrl) {
+  const body = document.body;
+  if (dataUrl) {
+    body.style.setProperty("--bg-image", `url("${dataUrl}")`);
+    body.classList.add("has-bg");
+    bgClearBtn.style.display = "inline-block";
+  } else {
+    body.style.removeProperty("--bg-image");
+    body.classList.remove("has-bg");
+    bgClearBtn.style.display = "none";
+  }
+}
+bgBtn.addEventListener("click", () => bgFileInput.click());
+bgClearBtn.addEventListener("click", () => {
+  applyBg(null);
+  try { localStorage.removeItem("news-reader-bg"); } catch (e) {}
+  bgFileInput.value = "";
+});
+bgFileInput.addEventListener("change", () => {
+  const f = bgFileInput.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const max = 1920;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (w > max || h > max) {
+      const r = Math.min(max / w, max / h);
+      w = Math.round(w * r); h = Math.round(h * r);
+    }
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    let q = 0.82;
+    let url = c.toDataURL("image/jpeg", q);
+    while (url.length > 4_500_000 && q > 0.4) {
+      q -= 0.1;
+      url = c.toDataURL("image/jpeg", q);
+    }
+    try { localStorage.setItem("news-reader-bg", url); } catch (e) {
+      alert("Nie udało się zapisać tła — obraz jest za duży dla localStorage. Spróbuj mniejszego zdjęcia.");
+      return;
+    }
+    applyBg(url);
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror = () => { alert("Nie udało się wczytać obrazu."); };
+  img.src = URL.createObjectURL(f);
+});
+(function initBg() {
+  let saved = null;
+  try { saved = localStorage.getItem("news-reader-bg"); } catch (e) {}
+  if (saved) applyBg(saved);
 })();
 
 (async function init() {

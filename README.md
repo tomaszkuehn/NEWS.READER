@@ -293,6 +293,13 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 - **Podgląd** — po otwarciu artykułu treść jest pobierana z API i renderowana
   w prawym panelu; działa również dla artykułów ukrytych przez „Ukryj
   nieaktualne" (endpoint szuka po `article_key`, nie po filtrowanej liście).
+- **Tło strony** — przycisk z ikoną obrazka (w toolbarze) pozwala wybrać
+  własne zdjęcie jako tło aplikacji. Obraz jest skalowany (max 1920px,
+  JPEG) i zapisywany w `localStorage`, więc przeżywa przeładowania. Tło
+  pojawia się w pustych przestrzeniach (między przyciskami kategorii,
+  w nagłówku jako frosted glass z `backdrop-filter: blur`, w stopce);
+  panele treści (lista, podgląd) pozostają nieprzezroczyste dla
+  czytelności. Przycisk **„Bez tła"** usuwa tło i czyści `localStorage`.
 
 ## Ulubione artykuły
 
