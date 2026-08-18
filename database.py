@@ -4,6 +4,11 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 RETENTION_DAYS = 7
+# Jak długo nowo odkryty artykuł jest widoczny w (wirtualnej) kategorii 'najnowsze'.
+FRESH_WINDOW = timedelta(hours=2)
+# „Ukryj nieaktualne" — domyślnie ukrywa artykuły starsze niż STALE_WINDOW
+# (wg daty publikacji, fallback first_seen).
+STALE_WINDOW = timedelta(days=7)
 
 
 def get_data_dir():
@@ -66,21 +71,36 @@ def init_db():
             conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at)")
         if "is_favorite" not in cols:
             conn.execute("ALTER TABLE articles ADD COLUMN is_favorite INTEGER DEFAULT 0")
+        if "article_key" not in cols:
+            conn.execute("ALTER TABLE articles ADD COLUMN article_key TEXT DEFAULT ''")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_article_key ON articles(article_key)")
+
+
+def _key(link):
+    """Stabilny identyfikator artykułu (delegat do onet_scraper.article_key)."""
+    from onet_scraper import article_key
+    return article_key(link) or link
 
 
 def is_known(link):
-    """Czy artykuł o danym linku istnieje już w bazie."""
+    """Czy artykuł o danym linku istnieje już w bazie (po article_key)."""
     with _connect() as conn:
         return conn.execute(
-            "SELECT 1 FROM articles WHERE link = ?", (link,)
+            "SELECT 1 FROM articles WHERE article_key = ?", (_key(link),)
         ).fetchone() is not None
 
 
 def upsert_article(article):
-    """Zapisuje artykuł, jeśli nie istnieje (klucz = link). Odświeża last_seen."""
+    """Zapisuje artykuł, jeśli nie istnieje (klucz = article_key). Odświeża last_seen.
+
+    Ten sam artykuł może mieć różne slugi w URL (Onet je zmienia) oraz dopisek
+    '#pco' — dedup po stabilnym article_key (domena + ID), a nie po pełnym linku.
+    Pierwszy widziany link jest zachowywany.
+    """
+    key = _key(article["link"])
     with _connect() as conn:
         row = conn.execute(
-            "SELECT link, category FROM articles WHERE link = ?", (article["link"],)
+            "SELECT link, category FROM articles WHERE article_key = ?", (key,)
         ).fetchone()
         if row:
             old_cat = row["category"]
@@ -88,48 +108,64 @@ def upsert_article(article):
             # Nadpisuj kategorię tylko jeśli wiemy lepiej (konkretna zamiast 'glowna')
             if old_cat == "glowna" and new_cat != "glowna":
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE link = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE article_key = ?",
                     (article.get("uuid", ""), article["title"], new_cat, article.get("image", ""),
-                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), article["link"]),
+                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), key),
                 )
             else:
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE link = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE article_key = ?",
                     (article.get("uuid", ""), article["title"], article.get("image", ""),
-                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), article["link"]),
+                     int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), key),
                 )
         else:
             conn.execute(
                 """
-                INSERT INTO articles (link, uuid, title, category, image, is_premium, published_at, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO articles (link, article_key, uuid, title, category, image, is_premium, published_at, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (article["link"], article.get("uuid", ""), article["title"],
+                (article["link"], key, article.get("uuid", ""), article["title"],
                  article["category"], article.get("image", ""),
                  int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), now_iso()),
             )
 
 
 def mark_read_and_store(link, details):
-    """Oznacza artykuł jako przeczytany i zapisuje jego treść."""
+    """Oznacza artykuł jako przeczytany i zapisuje jego treść (po article_key)."""
     with _connect() as conn:
         conn.execute(
             """
             UPDATE articles
             SET is_read = 1, content = ?, image = ?, lead = ?, published_at = COALESCE(NULLIF(?, ''), published_at)
-            WHERE link = ?
+            WHERE article_key = ?
             """,
             (details.get("content", ""), details.get("image", ""),
-             details.get("lead", ""), details.get("published_at", ""), link),
+             details.get("lead", ""), details.get("published_at", ""), _key(link)),
         )
 
 
-def get_articles(category=None, query=None, sort="newest", only_unread=False, only_favorites=False):
-    """Pobiera artykuły z filtrowaniem, wyszukiwaniem i sortowaniem."""
+def get_articles(category=None, query=None, sort="newest", only_unread=False, only_favorites=False, hide_stale=True):
+    """Pobiera artykuły z filtrowaniem, wyszukiwaniem i sortowaniem.
+
+    Kategoria 'najnowsze' jest wirtualna: pokazuje artykuły z ostatnich
+    FRESH_WINDOW (2h) wg daty publikacji (published_at; dla artykułów bez daty
+    wg first_seen — pierwszego znalezienia). Po upływie okna artykuł pozostaje
+    tylko w swojej kategorii treści.
+
+    hide_stale=True (domyślnie) ukrywa artykuły starsze niż STALE_WINDOW (7 dni)
+    wg tej samej daty efektywnej — dotyczy list, wyszukiwania i liczników.
+    """
     sql = "SELECT * FROM articles WHERE 1=1"
     params = []
+    eff = "COALESCE(NULLIF(published_at, ''), first_seen)"
 
-    if category and category != "wszystkie":
+    if category == "najnowsze":
+        now = datetime.now(timezone.utc).isoformat()
+        fresh_cutoff = (datetime.now(timezone.utc) - FRESH_WINDOW).isoformat()
+        # okno 2h wstecz; daty z przyszłości (błędne dane Onetu) są pomijane
+        sql += f" AND {eff} >= ? AND {eff} <= ?"
+        params += [fresh_cutoff, now]
+    elif category and category != "wszystkie":
         sql += " AND category = ?"
         params.append(category)
     if query:
@@ -140,13 +176,20 @@ def get_articles(category=None, query=None, sort="newest", only_unread=False, on
         sql += " AND is_read = 0"
     if only_favorites:
         sql += " AND is_favorite = 1"
+    if hide_stale:
+        stale_cutoff = (datetime.now(timezone.utc) - STALE_WINDOW).isoformat()
+        sql += f" AND {eff} >= ?"
+        params.append(stale_cutoff)
 
-    sql += {
-        "newest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) DESC",
-        "oldest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) ASC",
-        "title": " ORDER BY title COLLATE NOCASE ASC",
-        "read": " ORDER BY is_read DESC, last_seen DESC",
-    }.get(sort, " ORDER BY last_seen DESC")
+    if category == "najnowsze":
+        sql += f" ORDER BY {eff} DESC"
+    else:
+        sql += {
+            "newest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) DESC",
+            "oldest": " ORDER BY COALESCE(NULLIF(published_at, ''), last_seen) ASC",
+            "title": " ORDER BY title COLLATE NOCASE ASC",
+            "read": " ORDER BY is_read DESC, last_seen DESC",
+        }.get(sort, " ORDER BY last_seen DESC")
 
     with _connect() as conn:
         rows = conn.execute(sql, params).fetchall()
@@ -154,17 +197,17 @@ def get_articles(category=None, query=None, sort="newest", only_unread=False, on
 
 
 def mark_read(link):
-    """Oznacza artykuł jako przeczytany (bez treści)."""
+    """Oznacza artykuł jako przeczytany (bez treści, po article_key)."""
     with _connect() as conn:
-        conn.execute("UPDATE articles SET is_read = 1 WHERE link = ?", (link,))
+        conn.execute("UPDATE articles SET is_read = 1 WHERE article_key = ?", (_key(link),))
 
 
 def set_favorite(link, is_favorite):
-    """Ustawia oznaczenie artykułu jako ulubionego (1/0)."""
+    """Ustawia oznaczenie artykułu jako ulubionego (1/0, po article_key)."""
     with _connect() as conn:
         conn.execute(
-            "UPDATE articles SET is_favorite = ? WHERE link = ?",
-            (1 if is_favorite else 0, link),
+            "UPDATE articles SET is_favorite = ? WHERE article_key = ?",
+            (1 if is_favorite else 0, _key(link)),
         )
 
 
@@ -179,3 +222,81 @@ def cleanup_old():
             "DELETE FROM articles WHERE last_seen < ? AND is_favorite = 0", (cutoff,)
         )
         return cur.rowcount
+
+
+def migrate_categories(remap):
+    """Przyporządkowuje kategorię treści wpisom 'glowna'/'najnowsze'.
+
+    remap(link) -> nowa kategoria (z URL). Idempotentna.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT link FROM articles WHERE category IN ('glowna', 'najnowsze')"
+        ).fetchall()
+        for r in rows:
+            new_cat = remap(r["link"]) or "wiadomosci"
+            if new_cat not in ("glowna", "najnowsze"):
+                conn.execute(
+                    "UPDATE articles SET category = ? WHERE link = ?",
+                    (new_cat, r["link"]),
+                )
+        return len(rows)
+
+
+def migrate_article_keys(key_fn):
+    """Wypełnia article_key i scala istniejące duplikaty.
+
+    1. Ustawia article_key dla wierszy z pustym kluczem.
+    2. Grupuje po article_key; dla grup z >1 wierszem zostawia jeden
+       (najstarszy first_seen), scalając is_read/is_favorite/content/lead/image.
+    Idempotentna.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT link FROM articles WHERE article_key = '' OR article_key IS NULL"
+        ).fetchall()
+        for r in rows:
+            k = key_fn(r["link"]) or r["link"]
+            conn.execute("UPDATE articles SET article_key = ? WHERE link = ?", (k, r["link"]))
+
+        # scal duplikaty po article_key
+        groups = conn.execute(
+            """
+            SELECT article_key, GROUP_CONCAT(link) AS links
+            FROM articles WHERE article_key != '' GROUP BY article_key
+            HAVING COUNT(*) > 1
+            """
+        ).fetchall()
+        merged = 0
+        for g in groups:
+            links = g["links"].split(",")
+            keep = conn.execute(
+                "SELECT * FROM articles WHERE link = ? ORDER BY first_seen ASC LIMIT 1",
+                (links[0],),
+            ).fetchone()
+            keep_link = keep["link"]
+            other_links = [l for l in links if l != keep_link]
+            if not other_links:
+                continue
+            # scal flagi/treść z duplikatów do zachowanego wiersza
+            for ol in other_links:
+                dup = conn.execute("SELECT * FROM articles WHERE link = ?", (ol,)).fetchone()
+                if dup:
+                    conn.execute(
+                        """
+                        UPDATE articles SET
+                            is_read = MAX(is_read, ?),
+                            is_favorite = MAX(is_favorite, ?),
+                            content = COALESCE(NULLIF(content, ''), ?),
+                            lead = COALESCE(NULLIF(lead, ''), ?),
+                            image = COALESCE(NULLIF(image, ''), ?),
+                            summary = COALESCE(NULLIF(summary, ''), ?),
+                            published_at = COALESCE(NULLIF(published_at, ''), ?)
+                        WHERE link = ?
+                        """,
+                        (dup["is_read"], dup["is_favorite"], dup["content"], dup["lead"],
+                         dup["image"], dup["summary"], dup["published_at"], keep_link),
+                    )
+                conn.execute("DELETE FROM articles WHERE link = ?", (ol,))
+            merged += len(other_links)
+        return merged

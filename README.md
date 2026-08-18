@@ -50,7 +50,7 @@ POST /api/refresh
 Wątek w tle: co 10 min ±15s (fast) albo co 1h (slow) wywołuje refresh(trigger="auto")
 ```
 
-Odświeżenie przechodzi przez **wszystkie** kategorie po kolei. Duplikaty są obsługiwane dwupoziomowo: w obrębie jednego scrapu (słownik kluczowany po `link`) oraz w bazie (klucz główny `link`).
+Odświeżenie przechodzi przez **wszystkie** kategorie po kolei. Duplikaty są obsługiwane trójpłaszczyznowo: w obrębie jednego scrapu (słownik kluczowany po `article_key`), w bazie (klucz `article_key` — stabilny identyfikator `domena/ID`, ignorujący zmienne slugi Onetu i dopisek `#pco`), oraz przy migracji startowej (`migrate_article_keys` scala istniejące duplikaty).
 
 ## Wymagania i instalacja
 
@@ -150,7 +150,7 @@ w tray i otworzy czytnik w domyślnej przeglądarce.
 | GET | `/api/categories` | Lista kategorii |
 | POST | `/api/refresh` | Prosi o odświeżenie (z throttlingiem, zob. [Throttling odświeżeń](#throttling-odświeżeń)) |
 | GET | `/api/refresh/status` | Stan odświeżania (przerwa, limit/h, tryb, coverage) |
-| GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`, `favorite`) |
+| GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`, `favorite`, `hide_stale`). `category=najnowsze` zwraca artykuły z ostatnich 2h (wg `published_at`, fallback `first_seen`). `hide_stale=true` (domyślnie) ukrywa artykuły starsze niż 7 dni |
 | GET | `/api/articles/{link}/read` | Oznacza jako przeczytane i pobiera pełną treść |
 | POST | `/api/articles/{link}/favorite` | Ustawia/zdejmuje oznaczenie ulubionego (`favorite=true/false`) |
 | GET | `/api/health` | Status serwera |
@@ -186,7 +186,7 @@ Kategorie i ich URL-e są zdefiniowane w `CATEGORIES` (`onet_scraper.py`):
 | Kategoria | Źródła |
 |---|---|
 | `glowna` | `https://www.onet.pl` (User-Agent Googlebota) |
-| `najnowsze` | `wiadomosci.onet.pl/najnowsze` |
+| `najnowsze` | `wiadomosci.onet.pl/najnowsze` (feed zapisywany jako `wiadomosci`; zakładka to kategoria wirtualna — zob. niżej) |
 | `wiadomosci` | `wiadomosci.onet.pl` (+ `/kraj`, `/swiat`, `/polska`) |
 | `sport` | `przegladsportowy.onet.pl` (+ `/pilka-nozna`, `/tenis`, `/koszykowka`) |
 | `biznes` | `biznes.onet.pl`, `businessinsider.com.pl` (+ `/biznes`, `/gospodarka`, `/prawo`, `/finanse`, `/technologie`, `/praca`, `/nieruchomosci`) |
@@ -199,6 +199,25 @@ Kategorie i ich URL-e są zdefiniowane w `CATEGORIES` (`onet_scraper.py`):
 ### Strona główna Onetu
 
 Strona główna `www.onet.pl` jest renderowana przez JavaScript dla zwykłych przeglądarek — statyczny HTML zawiera tylko puste szkielety kart. Żeby otrzymać pełny SSR, scraper używa **User-Agent Googlebota** (`BOT_HEADERS`). Bez tego strona główna nie zawiera artykułów (testy wykazały 0 trafień zamiast ~200).
+
+### Kategoria „Najnowsze” (wirtualna)
+
+Zakładka **„Najnowsze"** nie jest kategorią trwałej treści — to **widok czasowy**:
+pokazuje artykuły **z ostatnich 2 godzin** (`FRESH_WINDOW`, `database.get_articles`).
+Okno liczone jest od **daty publikacji** (`published_at`); dla artykułów bez daty
+publikacji fallbackiem jest `first_seen` (pierwsze znalezienie w bazie).
+
+- Podczas scrapowania strony głównej dla każdego artykułu sprawdzane jest,
+  czy **link już istnieje w bazie** (`database.is_known` / upsert po `link`).
+- **Nowy** artykuł dostaje kategorię treści (sekcja/domena/ścieżka URL),
+  **a dodatkowo** pojawia się w „Najnowsze", jeśli jego data publikacji mieści
+  się w oknie 2h. Po wypadnięciu z okna zostaje **tylko w kategorii treści**.
+- Artykuł już obecny w bazie zachowuje swoją kategorię i **nie wraca**
+  do „Najnowsze" (upsert nie zmienia `first_seen`).
+- Artykuły z datą publikacji w przyszłości (błędne dane Onetu) są pomijane.
+- Feed `wiadomosci.onet.pl/najnowsze` jest zapisywany jako `wiadomosci`
+  (konfiguracja `"category": "wiadomosci"`), więc też świeci w „Najnowsze"
+  tylko w oknie 2h, a potem żyje jako zwykłe wiadomości.
 
 ## Jakie artykuły są zapisywane
 
@@ -244,6 +263,19 @@ Pomijane są następujące treści:
 
 7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`. **Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.**
 
+## Ukryj nieaktualne
+
+Checkbox **„Ukryj nieaktualne"** (domyślnie zaznaczony) ukrywa artykuły starsze
+niż **7 dni** (`STALE_WINDOW`) wg daty publikacji (`published_at`, fallback
+`first_seen` dla artykułów bez daty). Dotyczy:
+
+- list artykułów we wszystkich zakładkach,
+- wyszukiwania (szuka tylko w artykułach nieukrytych),
+- liczników zakładek.
+
+Odznaczenie pokazuje wszystkie artykuły (również wielomiesięczne). Filtr jest
+realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
+
 ## Ulubione artykuły
 
 Artykuły można oznaczać jako ulubione — symbolem jest **serce** (♥/♡). Serce
@@ -267,20 +299,20 @@ Kategoria artykułu jest ustalana w trzech krokach:
 
    | Sekcja na stronie głównej | Kategoria w aplikacji |
    |---|---|
-   | `news`, `importantnews`, `pilnaExtra`, `premium_only_for_sub`, `popular` | `najnowsze` |
    | `sport` | `sport` |
    | `economy` | `biznes` |
    | `lifestyle` | `inspiracje` |
    | `tech` | `technologie` |
    | `moto` | `motoryzacja` |
    | `travel` | `podroze` |
-   | pozostałe (m.in. sekcje reklamowe `bigbox*`, `oferty*`) | `glowna` (fallback) |
+   | sekcje ogólne (`news`, `importantnews`, `pilnaExtra`, `popular`, `premium_only_for_sub`) | kategoria z domeny/ścieżki URL (`_infer_category`, np. `wiadomosci.onet.pl` → `wiadomosci`, `www.onet.pl/sport/...` → `sport`) |
+   | pozostałe (m.in. sekcje reklamowe `bigbox*`, `oferty*`) | `glowna` (fallback, zastępowany przez `_infer_category`) |
 
 3. **Priorytet kategorii** — jeśli ten sam artykuł pojawia się w sekcji reklamowej (`glowna`) i w sekcji redakcyjnej (np. `sport`), wygrywa kategoria redakcyjna. Mechanizmy:
    - `_merge_article()` — dedup w obrębie jednego scrapu strony głównej: nadpisuje `glowna` → konkretną kategorią,
    - `database.upsert_article()` — przy zapisie do bazy: jeśli rekord ma kategorię `glowna`, a nowa wartość to konkretna kategoria, kategoria jest nadpisywana.
 
-Dzięki temu ten sam link nigdy nie występuje w więcej niż jednej kategorii (testy potwierdzają: 0 duplikatów między kategoriami).
+Dzięki temu ten sam link nigdy nie występuje w więcej niż jednej kategorii treści (testy potwierdzają: 0 duplikatów między kategoriami); „Najnowsze" jest osobnym, czasowym widokiem świeżo odkrytych artykułów.
 
 ## Struktura bazy danych
 
@@ -288,7 +320,8 @@ Plik: `articles.db` (SQLite). Tabela `articles`:
 
 | Kolumna | Typ | Opis |
 |---|---|---|
-| `link` | TEXT (PK) | URL artykułu — klucz dedup |
+| `link` | TEXT (PK) | URL artykułu (pierwszy widziany wariant) |
+| `article_key` | TEXT | Stabilny identyfikator: `domena/ID` (bez sluga, bez `#pco`, bez `www.`) — rzeczywisty klucz dedup |
 | `uuid` | TEXT | Unikalne ID z atrybutu `data-uuid-ui` |
 | `title` | TEXT | Tytuł |
 | `category` | TEXT | Kategoria (zob. [Kwalifikacja](#kwalifikacja-artykułów-do-grup-kategorii)) |
@@ -303,7 +336,7 @@ Plik: `articles.db` (SQLite). Tabela `articles`:
 | `first_seen` | TEXT | ISO — pierwsze wykrycie |
 | `last_seen` | TEXT | ISO — ostatnia aktualizacja |
 
-Migracje są wykonywane automatycznie w `init_db()` (`ALTER TABLE ... ADD COLUMN` dla brakujących kolumn `uuid` / `is_premium` / `published_at`), więc istniejąca baza jest aktualizowana bez utraty danych.
+Migracje są wykonywane automatycznie w `init_db()` (`ALTER TABLE ... ADD COLUMN` dla brakujących kolumn `uuid` / `is_premium` / `published_at` / `is_favorite` / `article_key`), a `migrate_article_keys()` w startcie aplikacji scala istniejące duplikaty (zachowuje najstarszy `first_seen`, przenosi `is_read`/`is_favorite`/treść). Istniejąca baza jest aktualizowana bez utraty danych.
 
 ## Implementacja
 

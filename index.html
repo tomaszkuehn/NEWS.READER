@@ -275,6 +275,7 @@
     </select>
     <label class="check"><input type="checkbox" id="unread"> tylko nieprzeczytane</label>
     <label class="check"><input type="checkbox" id="fav"> tylko ulubione</label>
+    <label class="check"><input type="checkbox" id="stale" checked> Ukryj nieaktualne</label>
     <button id="refresh" class="primary">Odśwież</button>
     <select id="theme" title="Wybierz styl aplikacji" aria-label="Wybierz styl aplikacji">
       <option value="light">Styl: czarny na białym</option>
@@ -468,6 +469,7 @@ async function loadArticles() {
   url.searchParams.set("sort", $("sort").value);
   url.searchParams.set("unread", $("unread").checked);
   url.searchParams.set("favorite", $("fav").checked);
+  url.searchParams.set("hide_stale", $("stale").checked);
 
   try {
     const r = await fetch(url);
@@ -488,11 +490,15 @@ async function loadArticles() {
 }
 
 async function loadCounts() {
+  const hs = $("stale").checked ? "&hide_stale=true" : "&hide_stale=false";
   try {
-    const r = await fetch("/api/articles");
-    const all = await r.json();
+    const [all, fresh] = await Promise.all([
+      fetch("/api/articles?" + hs.slice(1)).then((r) => r.json()),
+      fetch("/api/articles?category=najnowsze" + hs).then((r) => r.json()),
+    ]);
     const counts = { "wszystkie": all.length };
     for (const a of all) counts[a.category] = (counts[a.category] || 0) + 1;
+    counts["najnowsze"] = fresh.length;
     state.counts = counts;
   } catch (e) {
     state.counts = {};
@@ -689,6 +695,7 @@ $("search").addEventListener("input", () => {
 $("sort").addEventListener("change", loadArticles);
 $("unread").addEventListener("change", loadArticles);
 $("fav").addEventListener("change", loadArticles);
+$("stale").addEventListener("change", () => { loadArticles(); loadCounts(); });
 $("refresh").addEventListener("click", refresh);
 
 /* ===== Wybor stylu aplikacji ===== */

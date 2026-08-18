@@ -67,6 +67,28 @@ BOT_HEADERS = {
 
 ARTICLE_URL_RE = re.compile(r"/(?:[a-z0-9-]+/)+[a-z0-9]{6,}(?:,[0-9a-f]{8})?(?:#[a-z0-9]+)?$")
 
+# Sufiks sluga kończący się stabilnym ID artykułu (np. '/.../1xp7wn9' lub '/...,30bc1058').
+_ARTICLE_ID_RE = re.compile(r"/([a-z0-9]{6,})(?:,[0-9a-f]{8})?(?:#[a-z0-9]+)?$")
+
+
+def article_key(link):
+    """Stabilny identyfikator artykułu niezależny od sluga i kotwicy.
+
+    Onet zmienia slug w URL tej samej treści (np.
+    '/kolejny-odcinek-.../1xp7wn9' vs '/rafal-brzoska-.../1xp7wn9'),
+    a dopisek '#pco' pojawia się/znika losowo. Stabilnym klucdem jest
+    domena + końcowe ID artykułu. Zwraca '' gdy nie uda się wyłuskać ID.
+    """
+    s = link.split("#", 1)[0].rstrip("/")
+    m = _ARTICLE_ID_RE.search(s)
+    if not m:
+        return ""
+    host = re.match(r"https?://([^/]+)", link)
+    host = host.group(1).lower() if host else ""
+    if host.startswith("www."):
+        host = host[4:]
+    return f"{host}/{m.group(1)}"
+
 SPONSOR_PHRASES = (
     "materiał promocyjny",
     "materiał sponsorowany",
@@ -101,6 +123,10 @@ CATEGORIES = {
     },
     "najnowsze": {
         "urls": ["https://wiadomosci.onet.pl/najnowsze"],
+        # Feed najnowszych wiadomości — artykuły przechowywane w kategorii
+        # treści; w zakładce 'najnowsze' pojawiają się tylko przez 2h od
+        # pierwszego znalezienia (kategoria wirtualna, zob. database.get_articles).
+        "category": "wiadomosci",
     },
     "wiadomosci": {
         "urls": [
@@ -166,20 +192,111 @@ CATEGORIES = {
 LANGS = {"vr", "men", "kobieta", "happy", "magia", "styl", "gust", "romans"}
 
 # Mapowanie sekcji strony głównej (<section data-section="...">) na nasze kategorie.
+# Sekcje ogólne (news, importantnews, popular itd.) NIE są mapowane — artykuły
+# z nich dostają kategorię treści z domeny/ścieżki URL (patrz _infer_category).
 # Sekcje reklamowe (bigbox*, oferty*, paid_promo itd.) nie są mapowane.
 SECTION_TO_CATEGORY = {
-    "pilnaExtra": "najnowsze",
-    "importantnews": "najnowsze",
-    "news": "najnowsze",
-    "premium_only_for_sub": "najnowsze",
     "sport": "sport",
     "economy": "biznes",
     "lifestyle": "inspiracje",
     "tech": "technologie",
     "moto": "motoryzacja",
     "travel": "podroze",
-    "popular": "najnowsze",
 }
+
+# Dodatkowe domeny partnerskie -> nasza kategoria treści (dla _infer_category).
+# Domeny zdefiniowane w CATEGORIES (urle + domains) są brane automatycznie.
+_EXTRA_DOMAIN_CATEGORY = {
+    "newsweek.pl": "wiadomosci",
+    "www.newsweek.pl": "wiadomosci",
+    "fakt.pl": "wiadomosci",
+    "www.fakt.pl": "wiadomosci",
+    "ludzie.fakt.pl": "wiadomosci",
+    "medonet.pl": "wiadomosci",
+    "www.medonet.pl": "wiadomosci",
+    "zywienie.medonet.pl": "wiadomosci",
+    "komputerswiat.pl": "technologie",
+    "www.komputerswiat.pl": "technologie",
+    "forbes.pl": "biznes",
+    "www.forbes.pl": "biznes",
+    "plejada.pl": "kultura",
+    "www.plejada.pl": "kultura",
+    "noizz.pl": "inspiracje",
+    "www.noizz.pl": "inspiracje",
+    "ofeminin.pl": "inspiracje",
+    "www.ofeminin.pl": "inspiracje",
+    "lamoda.pl": "inspiracje",
+    "www.lamoda.pl": "inspiracje",
+}
+
+# Kanał w ścieżce www.onet.pl/<kanal>/... -> nasza kategoria.
+_CHANNEL_CATEGORY = {
+    "informacje": "wiadomosci",
+    "kraj": "wiadomosci",
+    "swiat": "wiadomosci",
+    "polska": "wiadomosci",
+    "polityka": "wiadomosci",
+    "news": "wiadomosci",
+    "sport": "sport",
+    "pilka-nozna": "sport",
+    "biznes": "biznes",
+    "gospodarka": "biznes",
+    "gielda": "biznes",
+    "finanse": "biznes",
+    "kultura": "kultura",
+    "film": "kultura",
+    "muzyka": "kultura",
+    "seriale": "kultura",
+    "ksiazki": "kultura",
+    "technologie": "technologie",
+    "technologia": "technologie",
+    "gry": "technologie",
+    "kobieta": "inspiracje",
+    "styl": "inspiracje",
+    "moda": "inspiracje",
+    "moto": "motoryzacja",
+    "motoryzacja": "motoryzacja",
+    "podroze": "podroze",
+    "turystyka": "podroze",
+}
+
+_DOMAIN_CATEGORY = {}
+for _cat, _cfg in CATEGORIES.items():
+    if _cat in ("glowna", "najnowsze"):
+        continue
+    _hosts = set(_cfg.get("domains", []))
+    for _u in _cfg.get("urls", []):
+        _h = re.match(r"https?://([^/]+)", _u)
+        if _h:
+            _hosts.add(_h.group(1).lower())
+    for _h in _hosts:
+        _DOMAIN_CATEGORY.setdefault(_h, _cat)
+for _h, _cat in _EXTRA_DOMAIN_CATEGORY.items():
+    _DOMAIN_CATEGORY.setdefault(_h, _cat)
+
+
+def _infer_category(url):
+    """Kategoria treści na podstawie domeny i ścieżki URL.
+
+    Używana dla artykułów, których sekcja strony głównej nie daje konkretnej
+    kategorii (np. news/importantnews) oraz do migracji starych wpisów
+    'glowna'/'najnowsze'. Fallback: 'wiadomosci'.
+    """
+    m = re.match(r"https?://([^/]+)(/[^/]*)?", url)
+    if not m:
+        return "wiadomosci"
+    host = m.group(1).lower()
+    first = (m.group(2) or "").strip("/").lower()
+    cat = _DOMAIN_CATEGORY.get(host)
+    if not cat:
+        # Obsługa wariantów www/non-www (np. www.businessinsider.com.pl)
+        alt = host[4:] if host.startswith("www.") else "www." + host
+        cat = _DOMAIN_CATEGORY.get(alt)
+    if cat:
+        return cat
+    if host == "www.onet.pl" and first:
+        return _CHANNEL_CATEGORY.get(first, "wiadomosci")
+    return "wiadomosci"
 
 
 def _section_category(art, default):
@@ -193,19 +310,24 @@ def _section_category(art, default):
 def _merge_article(found, art):
     """Dodaje artykuł z priorytetem dla kategorii z sekcji redakcyjnej.
 
-    Jeśli ten sam link był już znaleziony w sekcji reklamowej (domyślnie
-    'glowna'), a teraz wiemy, że należy do konkretnej kategorii, nadpisujemy.
-    Data publikacji jest uzupełniana, jeśli dopiero teraz ją poznaliśmy.
+    Dedup po stabilnym identyfikatorze (article_key), nie po pełnym linku —
+    Onet zmienia slug tego samego artykułu, a dopisek '#pco' pojawia się
+    losowo. Jeśli ten sam artykuł był już znaleziony w sekcji reklamowej
+    (domyślnie 'glowna'), a teraz wiemy, że należy do konkretnej kategorii,
+    nadpisujemy (zachowując dotychczasowy link). Data publikacji jest
+    uzupełniana, jeśli dopiero teraz ją poznaliśmy.
     """
-    link = art["link"]
-    if link not in found:
-        found[link] = art
+    key = article_key(art["link"]) or art["link"]
+    if key not in found:
+        found[key] = art
         return
-    if found[link]["category"] == "glowna" and art["category"] != "glowna":
-        found[link] = art
+    if found[key]["category"] == "glowna" and art["category"] != "glowna":
+        # zachowaj pierwszy link, nadpisz kategorię
+        art_keep_link = {**art, "link": found[key]["link"]}
+        found[key] = art_keep_link
         return
-    if not found[link].get("published_at") and art.get("published_at"):
-        found[link]["published_at"] = art["published_at"]
+    if not found[key].get("published_at") and art.get("published_at"):
+        found[key]["published_at"] = art["published_at"]
 
 
 def fetch_html(url, bot=False):
@@ -369,6 +491,7 @@ def extract_article_tags(soup, category):
 def scrape_category(category):
     """Zwraca listę artykułów wykrytych na stronach kategorii (bez RSS)."""
     cfg = CATEGORIES[category]
+    target_cat = cfg.get("category", category)
     found = {}
 
     for page_url in cfg["urls"]:
@@ -380,7 +503,7 @@ def scrape_category(category):
         dates = _parse_next_data_dates(html)
         sponsored_hrefs = _sponsored_hrefs(soup)
 
-        for art in extract_article_tags(soup, category):
+        for art in extract_article_tags(soup, target_cat):
             art["published_at"] = dates.get(art["link"], "")
             _merge_article(found, art)
 
@@ -394,7 +517,7 @@ def scrape_category(category):
             if not m:
                 continue
 
-            if not _is_accept_domain(href, category):
+            if not _is_accept_domain(href, target_cat):
                 continue
 
             title = _clean_title(a)
@@ -407,10 +530,16 @@ def scrape_category(category):
             _merge_article(found, {
                 "title": title,
                 "link": href,
-                "category": _section_category(a, category),
+                "category": _section_category(a, target_cat),
                 "is_premium": 1 if _is_premium_card(card) else 0,
                 "published_at": dates.get(href, ""),
             })
+
+    # Artykuły ze strony głównej, które wylądowały w sekcjach ogólnych
+    # (kategoria 'glowna'), dostają kategorię treści z domeny/ścieżki URL.
+    for art in found.values():
+        if art["category"] in ("glowna", "najnowsze"):
+            art["category"] = _infer_category(art["link"])
 
     return sorted(found.values(), key=lambda x: x["title"].lower())
 
@@ -515,6 +644,18 @@ def _parse_next_data_dates(html):
 
     walk(data)
     return dates
+
+
+def migrate_legacy_categories():
+    """Jednorazowa migracja starych wpisów 'glowna'/'najnowsze'.
+
+    Artykuły zapisane z kategorią 'glowna' (strona główna bez sekcji) lub
+    'najnowsze' (stary schemat) dostają kategorię treści wywnioskowaną z URL.
+    Idempotentna — po pierwszym przebiegu nie ma już takich wpisów.
+    """
+    import database
+
+    return database.migrate_categories(_infer_category)
 
 
 def fetch_article_details(link):

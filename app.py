@@ -20,6 +20,8 @@ app = FastAPI(title="News Reader")
 @app.on_event("startup")
 def startup():
     database.init_db()
+    database.migrate_article_keys(onet_scraper.article_key)
+    onet_scraper.migrate_legacy_categories()
     refresher.start()
 
 @app.get("/")
@@ -47,14 +49,14 @@ def articles(
     sort: str = Query("newest"),
     unread: bool = Query(False),
     favorite: bool = Query(False),
+    hide_stale: bool = Query(True),
 ):
-    return database.get_articles(category, q, sort, unread, favorite)
+    return database.get_articles(category, q, sort, unread, favorite, hide_stale)
 
 @app.post("/api/articles/{link:path}/favorite")
 def set_favorite(link: str, favorite: bool = Query(True)):
     """Ustawia lub zdejmuje oznaczenie artykułu jako ulubionego."""
-    arts = database.get_articles()
-    if not any(a["link"] == link for a in arts):
+    if not database.is_known(link):
         raise HTTPException(404, "Artykuł nie istnieje")
     database.set_favorite(link, favorite)
     return {"link": link, "is_favorite": 1 if favorite else 0}
@@ -62,14 +64,14 @@ def set_favorite(link: str, favorite: bool = Query(True)):
 @app.get("/api/articles/{link:path}/read")
 def read_article(link: str):
     """Oznacza artykuł jako przeczytany i zapisuje jego treść."""
-    arts = database.get_articles()
-    if not any(a["link"] == link for a in arts):
+    if not database.is_known(link):
         raise HTTPException(404, "Artykuł nie istnieje")
 
     details = onet_scraper.fetch_article_details(link)
     database.mark_read_and_store(link, details)
 
-    row = [a for a in database.get_articles() if a["link"] == link][0]
+    key = database._key(link)
+    row = [a for a in database.get_articles() if a.get("article_key") == key][0]
     return {
         **row,
         "details": details,
