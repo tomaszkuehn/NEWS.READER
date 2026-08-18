@@ -879,14 +879,16 @@ async function checkStatus() {
     const r = await fetch("/api/status");
     const s = await r.json();
     const btn = $("unlock-btn");
-    if (s.locked) {
-      btn.style.display = "inline-block";
-      btn.classList.add("shown");
-      btn.onclick = () => openUnlockModal(s.system_code);
-      setNote(`Osiągnięto limit ${s.limit} artykułów — wprowadź klucz, aby kontynuować pobieranie`);
-    } else {
+    if (s.unlocked) {
       btn.style.display = "none";
       btn.classList.remove("shown");
+    } else {
+      btn.style.display = "inline-block";
+      btn.classList.toggle("shown", !!s.locked);
+      btn.onclick = () => openUnlockModal(s.system_code);
+      if (s.locked) {
+        setNote(`Osiągnięto limit ${s.limit} artykułów — wprowadź klucz, aby kontynuować pobieranie`);
+      }
     }
     return s;
   } catch (e) {

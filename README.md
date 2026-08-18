@@ -308,9 +308,15 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 
 Gdy baza osiągnie **4000 artykułów**, dalsze pobieranie z Onetu jest
 blokowane — ręczne (`/api/refresh`) i automatyczne (pętla `refresher`).
-W menu na górze strony pojawia się przycisk **„Wprowadź klucz"** (pulsujący),
-który otwiera modal z **kodem systemu** (stabilny identyfikator maszyny,
-wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu).
+W menu na górze strony pojawia się przycisk **„Wprowadź klucz"** — gdy limit
+został osiągnięty, przycisk **pulsuje**; gdy limit nie został jeszcze
+osiągnięty, przycisk jest dostępny **prewencyjnie** (można wprowadzić klucz
+wcześniej). Po odblokowaniu przycisk znika.
+
+Kliknięcie otwiera modal z **kodem systemu** (stabilny identyfikator
+maszyny, wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu).
+Kod systemu jest zawsze dostępny w `/api/status` dopóki aplikacja nie jest
+odblokowana — niezależnie od liczby artykułów w bazie.
 
 Aby odblokować aplikację, należy:
 

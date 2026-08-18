@@ -40,12 +40,14 @@ def system_status():
     count = database.count_articles()
     unlocked = license.is_unlocked()
     locked = count >= license.LIMIT and not unlocked
+    # Kod systemu zawsze dostępny — użytkownik może wprowadzić klucz
+    # prewencyjnie (zanim baza osiągnie limit).
     return {
         "article_count": count,
         "limit": license.LIMIT,
         "locked": locked,
         "unlocked": unlocked,
-        "system_code": license.system_code() if locked else None,
+        "system_code": license.system_code() if not unlocked else None,
     }
 
 class UnlockReq(BaseModel):
