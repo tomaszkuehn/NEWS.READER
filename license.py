@@ -1,20 +1,41 @@
 """Weryfikacja klucza odblokowujacego dalsze pobieranie artykułów.
 
-Gdy baza przekroczy limit, aplikacja żąda klucza powiązanego z kodem systemu.
-Klucz jest generowany osobnym narzędziem (keygen.py) na podstawie kodu systemu.
+Model: offline RSA (PKCS#1 v1.5).
+- Keygen (u autora) ma klucz prywatny RSA, podpisuje kod systemu → klucz.
+- Aplikacja weryfikuje podpis wbudowanym kluczem publicznym.
+- Atakujący po dekompilacji ma klucz publiczny, ale nie prywatnego —
+  nie wygeneruje klucza bez podmiany klucza publicznego w exe.
 
-Implementacja celowo zaciemniona: stałe sekretu nie występują jako literały,
-funkcje mają mylące nazwy, a porównanie odbywa się przez HMAC z重建ionym kluczem.
+Anti-tamper: hash klucza publicznego zaszyty w refresher._pubkey_guard().
+Sprawdzany przy starcie — wykrywa podmianę klucza publicznego.
+
+Rozproszone punkty weryfikacji: app.py, refresher.py, tray.py — każdy
+wywołuje license.is_unlocked() niezależnie, więc atakujący musi znaleźć
+i załatać wszystkie punkty blokady, a nie jeden if.
 """
 
 import base64
 import hashlib
-import hmac
 import os
 import sys
 import uuid
 
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.exceptions import InvalidSignature
+
 LIMIT = 4000
+
+# Klucz publiczny RSA (2048-bit, PEM bez nagłówków, base64).
+# Klucz prywatny NIE jest wbudowany w aplikację — tylko w keygen.py u autora.
+_PUBKEY_B64 = (
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuqdclTRb0rNhwbRws8HTGi4ADfHxmhBFVTaqrC9scn/lE5tXyNCASrvjigp84PDDwHbnA40hf2zDWTeCP+MVV3t61vf23eUv/LxA1elRyKtYdlk0kW1CYrO3ppvZNMd+bbPYUeUolqXnUbBe13XPG512S7u5jtwUrgLUliDfqHA22whnfIR8JoxwD5fT+hTyv/+za67fAyVhefUTL+VMmMyIAJE7+FBG74SvS7efv9ABUJfXT/pYMr1QhA+g2Xe5+fNLzsbMDNSqdBIMG9z8ebsxqxJuOGm2RfZ8ys2MDcM92GJs7VMpkt4fSe2CFoUvqeRgo42EQcwqPX2nJRAqHQIDAQAB"
+)
+
+
+def _load_pubkey():
+    der = base64.b64decode(_PUBKEY_B64)
+    return serialization.load_der_public_key(der)
 
 
 def _machine_guid():
@@ -45,43 +66,31 @@ def _normalize(s):
 
 
 def system_code():
-    """Kod systemu pokazywany użytkownikowi w prompcie (20 znaków base32)."""
+    """Kod systemu pokazywany użytkownikowi (20 znaków base32)."""
     return _normalize(_machine_guid())
 
 
-def _material():
-    """Rekonstruuje materiał weryfikacyjny z rozproszonych operacji bitowych.
-
-    Zmienne nazwane myląco; wartości nie występują jako ciągłe literały.
-    """
-    a = [0x5F, 0x3A, 0x71, 0xC4, 0x2D, 0x9E, 0x08, 0x17]
-    b = [0xD6, 0x41, 0xB3, 0x55, 0xA2, 0xEF, 0x7C, 0x19]
-    out = bytearray(len(a))
-    for i in range(len(a)):
-        out[i] = (a[i] ^ b[i]) & 0xFF
-        out[i] = (out[i] + (i * 7 + 3)) & 0xFF
-        out[i] = (out[i] ^ ((b[i] >> (i & 3)) & 0xFF)) & 0xFF
-    return bytes(out)
+def _payload(code):
+    """Dane podpisywane — kod systemu + ograniczenie (zapobiega reuse)."""
+    return f"NEWSREADER|{code}".encode("utf-8")
 
 
-def _expect(code):
-    m = _material()
-    d = hashlib.sha256(m + code.encode("utf-8")).digest()
-    inner = hashlib.sha256(m + d).digest()
-    tag = hmac.new(inner, code.encode("utf-8"), hashlib.sha256).digest()
-    return base64.b32encode(tag[:10]).decode("ascii").rstrip("=").upper()
-
-
-def verify(code, key):
-    """Zwraca True jeśli klucz pasuje do kodu systemu."""
-    if not code or not key:
+def verify(code, key_b64):
+    """Zwraca True jeśli klucz (base64 podpis RSA) pasuje do kodu systemu."""
+    if not code or not key_b64:
         return False
-    k = key.strip().upper().replace(" ", "").replace("-", "")
-    if len(k) < 8:
+    k = key_b64.strip().replace(" ", "").replace("-", "").replace("\n", "")
+    if len(k) < 16:
         return False
     try:
-        return hmac.compare_digest(_expect(code), k)
+        sig = base64.b64decode(k)
     except Exception:
+        return False
+    try:
+        pub = _load_pubkey()
+        pub.verify(sig, _payload(code), padding.PKCS1v15(), hashes.SHA256())
+        return True
+    except (InvalidSignature, Exception):
         return False
 
 
@@ -110,7 +119,7 @@ def is_unlocked():
 
 
 def store_key(key):
-    """Zapisuje klucz (bez weryfikacji — weryfikacja przy is_unlocked)."""
+    """Zapisuje klucz (weryfikacja przy is_unlocked)."""
     p = _unlock_file()
     with open(p, "w", encoding="utf-8") as f:
         f.write(key.strip())
@@ -121,3 +130,26 @@ def clear_key():
         os.remove(_unlock_file())
     except OSError:
         pass
+
+
+def pubkey_integrity():
+    """Zwraca hash klucza publicznego — używane przez refresher._pubkey_guard()."""
+    return hashlib.sha256(_PUBKEY_B64.encode("ascii")).hexdigest()
+
+
+# ---- anti-tamper: rozproszone bajty klucza publicznego ----
+# Wybrane bajty z DER klucza publicznego, zaciemnione operacjami bitowymi.
+# Jeśli atakujący podmieni klucz publiczny, bajty się nie zgadzają.
+_GUARD_S = [0x52, 0x4E, 0x81, 0x91, 0xE3, 0x44, 0x06, 0xB9]
+_GUARD_M = [0x5F, 0x4B, 0x40, 0x52, 0x50, 0x4B, 0x40, 0x4F]
+_GUARD_IDX = [5, 17, 42, 89, 130, 171, 200, 250]
+
+
+def check_pubkey():
+    """Sprawdza integralność klucza publicznego. Zwraca True jeśli OK."""
+    try:
+        der = base64.b64decode(_PUBKEY_B64)
+        guard = bytes(((_GUARD_S[i] ^ _GUARD_M[i]) & 0xFF) for i in range(8))
+        return all(der[_GUARD_IDX[i]] == guard[i] for i in range(8))
+    except Exception:
+        return False

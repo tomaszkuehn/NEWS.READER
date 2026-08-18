@@ -24,6 +24,9 @@ def startup():
     database.init_db()
     database.migrate_article_keys(onet_scraper.article_key)
     onet_scraper.migrate_legacy_categories()
+    # Anti-tamper: jeśli klucz publiczny został podmieniony, nie startuj refreshera.
+    if not license.check_pubkey():
+        return
     refresher.start()
 
 @app.get("/")

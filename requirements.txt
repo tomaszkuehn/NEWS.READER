@@ -5,3 +5,4 @@ fastapi==0.111.0
 uvicorn==0.30.1
 pystray==0.19.5
 pywin32==312
+cryptography>=42.0.0

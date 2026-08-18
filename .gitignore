@@ -2,6 +2,11 @@
 articles.db
 *.db
 *.sqlite
+*.sqlite3
+
+# Klucze RSA (prywatny NIE w repo — tylko u autora)
+keys/
+.unlock
 
 # Losowy identyfikator przeglądarki (generowany per-instalacja)
 browser_identity.txt

@@ -7,6 +7,11 @@ import database
 import license
 import onet_scraper
 
+# Rozproszony punkt weryfikacji anti-tamper — drugi niezależny check.
+# Atakujący musi znaleźć i załatać wszystkie punkty, nie tylko license.py.
+def _tamper_ok():
+    return license.check_pubkey()
+
 # ---- konfiguracja throttlingu ----
 MIN_INTERVAL_SECONDS = 140        # min. przerwa miedzy odswiezeniami
 MAX_PER_HOUR = 15                 # limit odswiezen na godzine
@@ -141,6 +146,10 @@ def _auto_loop():
         # Nie scrapuj, gdy baza osiągnęła limit i nie wprowadzono klucza.
         try:
             if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+                continue
+            # Rozproszony punkt anti-tamper — jeśli klucz publiczny podmieniony,
+            # nie scrapuj (drugi niezależny check poza app.startup).
+            if not _tamper_ok():
                 continue
         except Exception:
             pass

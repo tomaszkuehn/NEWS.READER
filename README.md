@@ -328,14 +328,39 @@ Aby odblokować aplikację, należy:
    ```
 3. Wpisać zwrócony klucz w polu modala i potwierdzić.
 
-Klucz jest weryfikowany po stronie aplikacji (`license.verify`) — powiązanie
-z kodem systemu sprawia, że klucz jest ważny tylko na tej maszynie.
-Poprawny klucz jest zapisywany w pliku `.unlock` (katalog danych aplikacji,
+Klucz jest podpisany **RSA (PKCS#1 v1.5, 2048-bit)** kluczem prywatnym
+(`keys/private.pem`, tylko u autora). Aplikacja weryfikuje podpis
+wbudowanym **kluczem publicznym** (`license._PUBKEY_B64`) — bez klucza
+prywatnego nie da się wygenerować poprawnego klucza. Poprawny klucz jest
+zapisywany w pliku `.unlock` (katalog danych aplikacji,
 `%APPDATA%\NewsReader` w wersji instalacyjnej) i przeżywa restarty.
+Klucz jest powiązany z kodem systemu (MachineGuid), więc jest ważny tylko
+na tej maszynie.
 
-Mechanizm weryfikacji jest celowo zaciemniony (stałe sekretu nie występują
-jako literały, funkcje mają mylące nazwy, porównanie przez HMAC) — utrudnia
-to analizę kodu aplikacji w celu ominięcia zabezpieczenia.
+### Utrudnienia dla łamania
+
+- **Offline RSA** — klucz prywatny NIE jest wbudowany w aplikację; tylko w
+  `keygen.py` u autora. Po dekompilacji atakujący ma klucz publiczny, ale
+  nie prywatnego — nie wygeneruje klucza offline.
+- **Anti-tamper klucza publicznego** — 8 rozproszonych bajtów DER klucza
+  publicznego zaszytych w `license.py` (zaciemnionych operacjami bitowymi).
+  `license.check_pubkey()` weryfikuje integralność — wykrywa podmianę
+  klucza publicznego w exe.
+- **Rozproszone punkty weryfikacji** — blokada limitu i anti-tamper są
+  sprawdzane w trzech modułach niezależnie: `app.py` (startup + refresh),
+  `refresher.py` (pętla auto), `tray.py` (refresh z zasobnika). Atakujący
+  musi znaleźć i załatać wszystkie punkty, a nie jeden `if`.
+- **Klucz powiązany z maszyną** — kod systemu z `MachineGuid` (Windows) /
+  MAC (dev) sprawia, że klucz z jednej maszyny nie działa na innej.
+
+### Generacja kluczy RSA (jednorazowo, u autora)
+
+```
+python -c "from gen_keys import generate; generate()"
+```
+Tworzy `keys/private.pem` (do keygen) i `keys/public.pem` (wbudowany w
+`license.py` jako `_PUBKEY_B64`). `gen_keys.py` aktualizuje też stałe
+anti-tamper w `license.py`.
 
 ## Ulubione artykuły
 

@@ -115,6 +115,9 @@ def _make_icon_image():
 
 def _trigger_refresh():
     try:
+        # Rozproszony punkt weryfikacji — tray (ikona zasobnika) również sprawdza.
+        if not license.check_pubkey():
+            return
         if database.count_articles() >= license.LIMIT and not license.is_unlocked():
             return
         refresher.refresh(trigger="user")
