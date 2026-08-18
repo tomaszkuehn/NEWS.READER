@@ -293,13 +293,18 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 - **Podgląd** — po otwarciu artykułu treść jest pobierana z API i renderowana
   w prawym panelu; działa również dla artykułów ukrytych przez „Ukryj
   nieaktualne" (endpoint szuka po `article_key`, nie po filtrowanej liście).
-- **Tło strony** — przycisk z ikoną obrazka (w toolbarze) pozwala wybrać
-  własne zdjęcie jako tło aplikacji. Obraz jest skalowany (max 1920px,
-  JPEG) i zapisywany w `localStorage`, więc przeżywa przeładowania. Tło
-  pojawia się w pustych przestrzeniach (między przyciskami kategorii,
-  w nagłówku jako frosted glass z `backdrop-filter: blur`, w stopce);
-  panele treści (lista, podgląd) pozostają nieprzezroczyste dla
-  czytelności. Przycisk **„Bez tła"** usuwa tło i czyści `localStorage`.
+- **Tło strony** — dostępne przez **menu ustawień** (ikona koła zębatego w
+  toolbarze): **„Ustaw tło"** i **„Usuń tło"**. Obraz jest skalowany
+  (max 1920px, JPEG) i zapisywany w `localStorage`, więc przeżywa
+  przeładowania. Tło pojawia się w pustych przestrzeniach (między
+  przyciskami kategorii, w nagłówku jako frosted glass z
+  `backdrop-filter: blur`, w stopce); panele treści (lista, podgląd)
+  pozostają nieprzezroczyste dla czytelności.
+- **Menu ustawień** — ikona koła zębatego w toolbarze rozwija menu:
+  „Ustaw tło", „Usuń tło" (nieaktywne gdy brak tła), „O aplikacji".
+  Modal „O aplikacji" zawiera informacje o aplikacji, statystyki bazy
+  (liczba artykułów, limit, status) oraz sekcję klucza odblokowującego
+  (gdy aplikacja nie jest odblokowana).
 - **Czas odświeżenia** — po odświeżeniu w pasku pod kategoriami pojawia się
   „Odświeżono ✓ (X min temu)"; licznik jest aktualizowany co 30 s.
 - **Stopka** — zawiera informację o prawach autorskich: „(C) Tomasz Kuehn 2026".
@@ -308,15 +313,11 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 
 Gdy baza osiągnie **4000 artykułów**, dalsze pobieranie z Onetu jest
 blokowane — ręczne (`/api/refresh`) i automatyczne (pętla `refresher`).
-W menu na górze strony pojawia się przycisk **„Wprowadź klucz"** — gdy limit
-został osiągnięty, przycisk **pulsuje**; gdy limit nie został jeszcze
-osiągnięty, przycisk jest dostępny **prewencyjnie** (można wprowadzić klucz
-wcześniej). Po odblokowaniu przycisk znika.
-
-Kliknięcie otwiera modal z **kodem systemu** (stabilny identyfikator
-maszyny, wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu).
-Kod systemu jest zawsze dostępny w `/api/status` dopóki aplikacja nie jest
-odblokowana — niezależnie od liczby artykułów w bazie.
+W modalu **„O aplikacji"** (menu ustawień → „O aplikacji") dostępna jest
+sekcja klucza z **kodem systemu** (stabilny identyfikator maszyny,
+wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu). Klucz
+można wprowadzić **prewencyjnie** — przed osiągnięciem limitu. Gdy limit
+został osiągnięty, w pasku pod kategoriami pojawia się stosowny komunikat.
 
 Aby odblokować aplikację, należy:
 

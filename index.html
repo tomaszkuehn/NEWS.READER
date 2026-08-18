@@ -303,9 +303,29 @@
   #unlock-key { font-family: monospace; font-size: 14px; }
   .modal-error { color: #d32f2f; font-size: 13px; min-height: 18px; margin: 0 0 12px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-  #unlock-btn { font-weight: 600; }
-  #unlock-btn.shown { animation: pulse 1.8s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(229,57,53,.4); } 50% { box-shadow: 0 0 0 6px rgba(229,57,53,0); } }
+  /* ===== Dropdown (settings) ===== */
+  .menu-wrap { position: relative; }
+  .dropdown-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 50;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 4px; min-width: 170px;
+    overflow: hidden;
+  }
+  .dropdown-menu button {
+    display: block; width: 100%; text-align: left; border: none;
+    background: transparent; padding: 8px 12px; font-size: 14px; border-radius: 6px;
+  }
+  .dropdown-menu button:hover:not(:disabled) { background: var(--panel2); }
+  .dropdown-menu button:disabled { opacity: .45; cursor: default; }
+  .dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* ===== About modal ===== */
+  .modal-about { max-width: 520px; }
+  .about-info p { margin: 0 0 6px; font-size: 13.5px; }
+  .about-stats { margin: 12px 0; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+  .about-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .about-section h4 { margin: 0 0 8px; font-size: 15px; }
+  .about-section .muted { font-size: 12.5px; margin: 0 0 12px; }
 </style>
 </head>
 <body>
@@ -334,11 +354,17 @@
       <option value="sepia">Styl: sepia (kremowy)</option>
     </select>
     <input type="file" id="bg-file" accept="image/*" style="display:none">
-    <button id="bg-btn" class="icon-btn" type="button" title="Wybierz zdjęcie jako tło strony" aria-label="Wybierz zdjęcie jako tło strony">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L6 21"/></svg>
-    </button>
-    <button id="bg-clear" type="button" title="Wyczyść tło strony" aria-label="Wyczyść tło strony" style="display:none">Bez tła</button>
-    <button id="unlock-btn" type="button" title="Wprowadź klucz odblokowujący pobieranie artykułów" style="display:none">Wprowadź klucz</button>
+    <div class="menu-wrap">
+      <button id="settings-btn" class="icon-btn" type="button" title="Ustawienia" aria-label="Ustawienia" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <div id="settings-menu" class="dropdown-menu" style="display:none">
+        <button type="button" id="menu-bg-set">Ustaw tło</button>
+        <button type="button" id="menu-bg-clear" disabled>Usuń tło</button>
+        <div class="dropdown-sep"></div>
+        <button type="button" id="menu-about">O aplikacji</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -361,22 +387,43 @@
 
 <footer>News Reader · dane pobierane z onet.pl · (C) Tomasz Kuehn 2026</footer>
 
-<div id="unlock-modal" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <h3>Wprowadź klucz</h3>
-    <p>Osiągnięto limit artykułów w bazie. Aby kontynuować pobieranie, wprowadź klucz powiązany z kodem Twojego systemu.</p>
-    <div class="modal-field">
-      <label for="unlock-code">Kod systemu:</label>
-      <input id="unlock-code" type="text" readonly>
+<div id="about-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-about">
+    <h3>News Reader</h3>
+    <div class="about-info">
+      <p>Czytnik wiadomości pobieranych z <strong>onet.pl</strong>.</p>
+      <p class="muted">News Reader · (C) Tomasz Kuehn 2026</p>
+      <div class="about-stats">
+        <div><span class="muted">Artykuły w bazie:</span> <strong id="about-count">—</strong></div>
+        <div><span class="muted">Limit:</span> <strong id="about-limit">—</strong></div>
+        <div><span class="muted">Status:</span> <strong id="about-status">—</strong></div>
+      </div>
     </div>
-    <div class="modal-field">
-      <label for="unlock-key">Klucz:</label>
-      <input id="unlock-key" type="text" placeholder="Wpisz klucz" autocomplete="off">
+
+    <div id="about-unlock" class="about-section" style="display:none">
+      <h4>Klucz odblokowujący</h4>
+      <p class="muted">Wprowadź klucz powiązany z kodem Twojego systemu, aby podnieść limit artykułów. Możesz to zrobić prewencyjnie — przed osiągnięciem limitu.</p>
+      <div class="modal-field">
+        <label for="unlock-code">Kod systemu:</label>
+        <input id="unlock-code" type="text" readonly>
+      </div>
+      <div class="modal-field">
+        <label for="unlock-key">Klucz:</label>
+        <input id="unlock-key" type="text" placeholder="Wpisz klucz" autocomplete="off">
+      </div>
+      <p id="unlock-error" class="modal-error"></p>
+      <div class="modal-actions">
+        <button id="unlock-submit" type="button" class="primary">Potwierdź klucz</button>
+      </div>
     </div>
-    <p id="unlock-error" class="modal-error"></p>
+
+    <div id="about-unlocked" class="about-section" style="display:none">
+      <h4>Klucz odblokowujący</h4>
+      <p class="muted">Aplikacja jest odblokowana. Limit artykułów nie obowiązuje.</p>
+    </div>
+
     <div class="modal-actions">
-      <button id="unlock-cancel" type="button">Anuluj</button>
-      <button id="unlock-submit" type="button" class="primary">Potwierdź</button>
+      <button id="about-close" type="button" class="primary">Zamknij</button>
     </div>
   </div>
 </div>
@@ -817,22 +864,22 @@ themeSel.onchange = () => {
 
 /* ===== Tlo strony (zdjecie uzytkownika) ===== */
 const bgFileInput = $("bg-file");
-const bgBtn = $("bg-btn");
-const bgClearBtn = $("bg-clear");
+const menuBgClear = $("menu-bg-clear");
 function applyBg(dataUrl) {
   const body = document.body;
   if (dataUrl) {
     body.style.setProperty("--bg-image", `url("${dataUrl}")`);
     body.classList.add("has-bg");
-    bgClearBtn.style.display = "inline-block";
+    menuBgClear.disabled = false;
   } else {
     body.style.removeProperty("--bg-image");
     body.classList.remove("has-bg");
-    bgClearBtn.style.display = "none";
+    menuBgClear.disabled = true;
   }
 }
-bgBtn.addEventListener("click", () => bgFileInput.click());
-bgClearBtn.addEventListener("click", () => {
+$("menu-bg-set").addEventListener("click", () => { closeSettingsMenu(); bgFileInput.click(); });
+menuBgClear.addEventListener("click", () => {
+  closeSettingsMenu();
   applyBg(null);
   try { localStorage.removeItem("news-reader-bg"); } catch (e) {}
   bgFileInput.value = "";
@@ -873,22 +920,36 @@ bgFileInput.addEventListener("change", () => {
   if (saved) applyBg(saved);
 })();
 
+/* ===== Menu ustawien (dropdown) ===== */
+const settingsBtn = $("settings-btn");
+const settingsMenu = $("settings-menu");
+function openSettingsMenu() {
+  settingsMenu.style.display = "block";
+  settingsBtn.setAttribute("aria-expanded", "true");
+}
+function closeSettingsMenu() {
+  settingsMenu.style.display = "none";
+  settingsBtn.setAttribute("aria-expanded", "false");
+}
+settingsBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (settingsMenu.style.display === "block") closeSettingsMenu();
+  else openSettingsMenu();
+});
+document.addEventListener("click", (e) => {
+  if (settingsMenu.style.display === "block" && !e.target.closest(".menu-wrap")) closeSettingsMenu();
+});
+$("menu-about").addEventListener("click", () => { closeSettingsMenu(); openAboutModal(); });
+
 /* ===== Limit artykułów / klucz odblokowujący ===== */
+let lastStatus = null;
 async function checkStatus() {
   try {
     const r = await fetch("/api/status");
     const s = await r.json();
-    const btn = $("unlock-btn");
-    if (s.unlocked) {
-      btn.style.display = "none";
-      btn.classList.remove("shown");
-    } else {
-      btn.style.display = "inline-block";
-      btn.classList.toggle("shown", !!s.locked);
-      btn.onclick = () => openUnlockModal(s.system_code);
-      if (s.locked) {
-        setNote(`Osiągnięto limit ${s.limit} artykułów — wprowadź klucz, aby kontynuować pobieranie`);
-      }
+    lastStatus = s;
+    if (s.locked) {
+      setNote(`Osiągnięto limit ${s.limit} artykułów — wprowadź klucz, aby kontynuować pobieranie`);
     }
     return s;
   } catch (e) {
@@ -896,20 +957,41 @@ async function checkStatus() {
   }
 }
 
-function openUnlockModal(code) {
-  $("unlock-code").value = code || "";
-  $("unlock-key").value = "";
-  $("unlock-error").textContent = "";
-  const modal = $("unlock-modal");
-  modal.style.display = "flex";
-  $("unlock-key").focus();
+function openAboutModal() {
+  const s = lastStatus;
+  $("about-count").textContent = s ? s.article_count : "—";
+  $("about-limit").textContent = s ? s.limit : "—";
+  const statusEl = $("about-status");
+  if (s) {
+    if (s.unlocked) statusEl.textContent = "odblokowany";
+    else if (s.locked) statusEl.textContent = "zablokowany (limit osiągnięty)";
+    else statusEl.textContent = `aktywny (poniżej limitu)`;
+  } else {
+    statusEl.textContent = "—";
+  }
+  const unlockSection = $("about-unlock");
+  const unlockedSection = $("about-unlocked");
+  if (s && s.unlocked) {
+    unlockSection.style.display = "none";
+    unlockedSection.style.display = "block";
+  } else {
+    unlockedSection.style.display = "none";
+    unlockSection.style.display = "block";
+    $("unlock-code").value = (s && s.system_code) || "";
+    $("unlock-key").value = "";
+    $("unlock-error").textContent = "";
+  }
+  $("about-modal").style.display = "flex";
 }
 
-function closeUnlockModal() {
-  $("unlock-modal").style.display = "none";
+function closeAboutModal() {
+  $("about-modal").style.display = "none";
 }
 
-$("unlock-cancel").addEventListener("click", closeUnlockModal);
+$("about-close").addEventListener("click", closeAboutModal);
+$("about-modal").addEventListener("click", (e) => {
+  if (e.target.id === "about-modal") closeAboutModal();
+});
 $("unlock-submit").addEventListener("click", async () => {
   const key = $("unlock-key").value.trim();
   const errEl = $("unlock-error");
@@ -922,8 +1004,8 @@ $("unlock-submit").addEventListener("click", async () => {
       body: JSON.stringify({ key }),
     });
     if (r.ok) {
-      closeUnlockModal();
       await checkStatus();
+      openAboutModal();
       setNote("Odblokowano ✓ — można odświeżać artykuły");
       refresh();
     } else {
