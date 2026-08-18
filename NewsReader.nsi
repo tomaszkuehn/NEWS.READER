@@ -13,7 +13,7 @@
 
 !define PRODUCT_NAME "News Reader"
 !define PRODUCT_FILE "NewsReader.exe"
-!define PRODUCT_VERSION "1.4.15"
+!define PRODUCT_VERSION "1.4.16"
 !define PRODUCT_UNINSTALL "Uninstall NewsReader.exe"
 !define APP_REG_KEY "Software\NewsReader"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NewsReader"

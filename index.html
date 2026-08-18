@@ -578,7 +578,9 @@ function renderList() {
   scrollSelectedIntoView();
 }
 
+let _loadSeq = 0;
 async function loadArticles() {
+  const seq = ++_loadSeq;
   const list = $("list");
   list.innerHTML = '<div id="loader"><div id="spinner"></div>Ładowanie...</div>';
   $("empty").style.display = "none";
@@ -596,8 +598,10 @@ async function loadArticles() {
   try {
     const r = await fetch(url);
     const data = await r.json();
+    if (seq !== _loadSeq) return;  // nowszy request w międzyczasie — ignoruj
     state.articles = data;
   } catch (e) {
+    if (seq !== _loadSeq) return;
     state.articles = [];
   }
 
