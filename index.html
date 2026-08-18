@@ -939,7 +939,7 @@ settingsBtn.addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   if (settingsMenu.style.display === "block" && !e.target.closest(".menu-wrap")) closeSettingsMenu();
 });
-$("menu-about").addEventListener("click", () => { closeSettingsMenu(); openAboutModal(); });
+$("menu-about").addEventListener("click", async () => { closeSettingsMenu(); await checkStatus(); openAboutModal(); });
 
 /* ===== Limit artykułów / klucz odblokowujący ===== */
 let lastStatus = null;
