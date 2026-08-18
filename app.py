@@ -64,14 +64,14 @@ def set_favorite(link: str, favorite: bool = Query(True)):
 @app.get("/api/articles/{link:path}/read")
 def read_article(link: str):
     """Oznacza artykuł jako przeczytany i zapisuje jego treść."""
-    if not database.is_known(link):
+    row = database.get_article_by_key(link)
+    if not row:
         raise HTTPException(404, "Artykuł nie istnieje")
 
     details = onet_scraper.fetch_article_details(link)
     database.mark_read_and_store(link, details)
 
-    key = database._key(link)
-    row = [a for a in database.get_articles() if a.get("article_key") == key][0]
+    row = database.get_article_by_key(link)
     return {
         **row,
         "details": details,

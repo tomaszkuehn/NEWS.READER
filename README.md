@@ -151,7 +151,7 @@ w tray i otworzy czytnik w domyślnej przeglądarce.
 | POST | `/api/refresh` | Prosi o odświeżenie (z throttlingiem, zob. [Throttling odświeżeń](#throttling-odświeżeń)) |
 | GET | `/api/refresh/status` | Stan odświeżania (przerwa, limit/h, tryb, coverage) |
 | GET | `/api/articles` | Lista artykułów (filtry: `category`, `q`, `sort`, `unread`, `favorite`, `hide_stale`). `category=najnowsze` zwraca artykuły z ostatnich 2h (wg `published_at`, fallback `first_seen`). `hide_stale=true` (domyślnie) ukrywa artykuły starsze niż 7 dni |
-| GET | `/api/articles/{link}/read` | Oznacza jako przeczytane i pobiera pełną treść |
+| GET | `/api/articles/{link}/read` | Oznacza jako przeczytane i pobiera pełną treść (działa również dla artykułów ukrytych przez „Ukryj nieaktualne" — szuka po `article_key`) |
 | POST | `/api/articles/{link}/favorite` | Ustawia/zdejmuje oznaczenie ulubionego (`favorite=true/false`) |
 | GET | `/api/health` | Status serwera |
 
@@ -275,6 +275,24 @@ niż **7 dni** (`STALE_WINDOW`) wg daty publikacji (`published_at`, fallback
 
 Odznaczenie pokazuje wszystkie artykuły (również wielomiesięczne). Filtr jest
 realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
+
+## Interfejs
+
+- **Layout aplikacji** — cała strona ma `height: 100vh; overflow: hidden`
+  (model aplikacji, nie dokumentu). Tylko **lista artykułów** (`#list`) i
+  **treść podglądu** (`#preview-body`) mają własne pionowe scrolle;
+  nagłówek, pasek kategorii i stopka są nieruchome. Na wąskich ekranach
+  (≤980px) podgląd staje się pełnoekranowym modalem (`position: fixed`).
+- **Pasek kategorii** — poziomo przewijalny; gdy kategorii jest więcej niż
+  zmieści ekran, po bokach pojawiają się **strzałki ‹ ›** (klik = płynne
+  przewinięcie). Aktywna zakładka jest automatycznie centrowana.
+- **Wyszukiwanie** — pole z ikoną lupy i przyciskiem **×** (pojawia się gdy jest
+  wpisany tekst); kliknięcie czyści pole i przeładowuje listę. Wyszukiwanie
+  odbywa się tylko w artykułach nieukrytych (zgodnie z filtrami, w tym
+  „Ukryj nieaktualne").
+- **Podgląd** — po otwarciu artykułu treść jest pobierana z API i renderowana
+  w prawym panelu; działa również dla artykułów ukrytych przez „Ukryj
+  nieaktualne" (endpoint szuka po `article_key`, nie po filtrowanej liście).
 
 ## Ulubione artykuły
 

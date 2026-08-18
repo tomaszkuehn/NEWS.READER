@@ -90,6 +90,15 @@ def is_known(link):
         ).fetchone() is not None
 
 
+def get_article_by_key(link):
+    """Pobiera wiersz artykułu po article_key (ignoruje filtry hide_stale/kategoria)."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM articles WHERE article_key = ?", (_key(link),)
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def upsert_article(article):
     """Zapisuje artykuł, jeśli nie istnieje (klucz = article_key). Odświeża last_seen.
 
