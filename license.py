@@ -20,6 +20,7 @@ i załatać wszystkie punkty blokady, a nie jeden if.
 import base64
 import hashlib
 import os
+import struct
 import sys
 import time
 import uuid
@@ -114,25 +115,84 @@ def _trial_file():
     return os.path.join(_data_dir(), ".trial")
 
 
+# ---- obfuskacja danych pliku .trial ----
+# Rozproszony klucz (nie występuje jako literał w binarnym). Łączony XOR.
+_S7 = [0x4A, 0x91, 0x33, 0xC8, 0x5E, 0x12, 0xD0, 0x6F]
+_S7M = [0x21, 0x55, 0x1B, 0xB7, 0x11, 0x44, 0xA2, 0x33]
+_S9 = [0x10, 0xE7, 0x5F, 0x22, 0x77, 0xC3, 0x88, 0xF1]
+_S9M = [0x3A, 0x44, 0xB2, 0x15, 0x6E, 0x91, 0xFC, 0x97]
+
+def _k1():
+    return bytes(((_S7[i] ^ _S7M[i]) & 0xFF) for i in range(8))
+
+def _k2():
+    return bytes(((_S9[i] ^ _S9M[i]) & 0xFF) for i in range(8))
+
+def _hmac(data):
+    k = _k1() + _k2()
+    import hmac as _h
+    return _h.new(k, data, hashlib.sha256).digest()[:16]
+
+def _wrap(ts):
+    raw = struct.pack(">d", ts)
+    sig = _hmac(raw)
+    body = raw + sig
+    key = _k1() + _k2()
+    out = bytes(body[i] ^ key[i % len(key)] for i in range(len(body)))
+    return base64.b64encode(out).decode("ascii")
+
+def _unwrap(s):
+    try:
+        data = base64.b64decode(s.strip())
+    except Exception:
+        return None
+    key = _k1() + _k2()
+    body = bytes(data[i] ^ key[i % len(key)] for i in range(len(data)))
+    if len(body) != 24:
+        return None
+    raw, sig = body[:8], body[8:24]
+    if _hmac(raw) != sig:
+        return None
+    try:
+        return struct.unpack(">d", raw)[0]
+    except struct.error:
+        return None
+
+# Stan manipulacji — ustawiany gdy HMAC się nie zgadza.
+_tampered = False
+
+def is_tampered():
+    return _tampered
+
 def trial_start():
-    """Zapisuje timestamp pierwszego uruchomienia (jeśli nie istnieje)."""
+    """Zapisuje zaszyfrowany timestamp pierwszego uruchomienia (jeśli nie istnieje)."""
+    global _tampered
     p = _trial_file()
     if not os.path.isfile(p):
         try:
             with open(p, "w", encoding="utf-8") as f:
-                f.write(str(time.time()))
+                f.write(_wrap(time.time()))
         except OSError:
             pass
+    else:
+        # Weryfikuj istniejący plik — jeśli manipulowany, oznacz.
+        ts = _read_trial()
+        if ts is None:
+            _tampered = True
 
 
-def trial_start_ts():
-    """Zwraca timestamp startu okresu próbnego, lub None jeśli brak."""
+def _read_trial():
     p = _trial_file()
     try:
         with open(p, "r", encoding="utf-8") as f:
-            return float(f.read().strip())
-    except (OSError, ValueError):
+            return _unwrap(f.read())
+    except OSError:
         return None
+
+
+def trial_start_ts():
+    """Zwraca timestamp startu okresu próbnego, lub None jeśli brak/manipulowany."""
+    return _read_trial()
 
 
 def trial_days_left():
@@ -146,8 +206,8 @@ def trial_days_left():
 
 
 def trial_expired():
-    """True jeśli okres próbny minął."""
-    return trial_days_left() <= 0
+    """True jeśli okres próbny minął LUB wykryto manipulację."""
+    return _tampered or trial_days_left() <= 0
 
 
 def is_unlocked():
@@ -166,8 +226,8 @@ def is_unlocked():
 
 
 def is_active():
-    """Czy aplikacja może pobierać artykuły: odblokowana LUB w okresie próbnym."""
-    return is_unlocked() or not trial_expired()
+    """Czy aplikacja może pobierać artykuły: odblokowana LUB w okresie próbnym (bez manipulacji)."""
+    return is_unlocked() or (not _tampered and not trial_expired())
 
 
 def store_key(key):

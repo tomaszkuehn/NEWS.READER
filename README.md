@@ -345,6 +345,12 @@ zapisywany w pliku `.trial` (katalog danych aplikacji,
 **odświeżanie** artykułów (ręczne i automatyczne) jest blokowane —
 przeglądanie zapisanych artykułów nadal działa.
 
+Plik `.trial` jest **zaszyfrowany** (XOR z rozproszonym kluczem + HMAC-SHA256).
+Timestamp nie jest zapisany jawnie — edycja pliku w edytorze tekstu
+powoduje niezgodność HMAC i aplikacja wykrywa **niedozwoloną modyfikację**,
+blokując odświeżanie (komunikat w pasku i modalu „O aplikacji"). Odblokowanie
+kluczem RSA nadal działa po wykryciu manipulacji.
+
 Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
 kategoriami pojawia się przypomnienie. Po upływie — komunikat o blokadzie.
 

@@ -53,6 +53,7 @@ def system_status():
         "trial_days_left": round(days_left, 1),
         "trial_expired": license.trial_expired(),
         "trial_days": license.TRIAL_DAYS,
+        "tampered": license.is_tampered(),
         "system_code": license.system_code() if not unlocked else None,
     }
 

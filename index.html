@@ -972,7 +972,9 @@ async function checkStatus() {
     const r = await fetch("/api/status");
     const s = await r.json();
     lastStatus = s;
-    if (s.trial_expired && !s.unlocked) {
+    if (s.tampered && !s.unlocked) {
+      setNote("Wykryto niedozwoloną modyfikację — wprowadź klucz, aby kontynuować");
+    } else if (s.trial_expired && !s.unlocked) {
       setNote(`Okres próbny minął — wprowadź klucz, aby kontynuować pobieranie`);
     } else if (!s.unlocked && s.trial_days_left <= 5) {
       setNote(`Okres próbny: ${Math.ceil(s.trial_days_left)} dni zostało — wprowadź klucz, aby kontynuować po upływie`);
@@ -991,6 +993,9 @@ function openAboutModal() {
     if (s.unlocked) {
       trialEl.textContent = "odblokowany";
       statusEl.textContent = "odblokowany";
+    } else if (s.tampered) {
+      trialEl.textContent = "niedozwolona modyfikacja";
+      statusEl.textContent = "zablokowany (wykryto manipulację)";
     } else if (s.trial_expired) {
       trialEl.textContent = "minął";
       statusEl.textContent = "zablokowany (okres próbny minął)";
