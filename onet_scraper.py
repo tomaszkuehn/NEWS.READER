@@ -330,10 +330,28 @@ def _merge_article(found, art):
         found[key]["published_at"] = art["published_at"]
 
 
+# Ostatni czas serwera (epoch UTC) z nagłówka Date odpowiedzi HTTP.
+# Niezależny od zegara użytkownika — służy jako zaufana kotwica czasu
+# dla okresu próbnego (odporność na manipulację zegarem).
+_last_server_time = None
+
+
+def last_server_time():
+    return _last_server_time
+
+
 def fetch_html(url, bot=False):
     r = requests.get(url, headers=BOT_HEADERS if bot else HEADERS, timeout=20)
     r.raise_for_status()
     r.encoding = "utf-8"
+    global _last_server_time
+    hdr = r.headers.get("Date")
+    if hdr:
+        try:
+            import email.utils
+            _last_server_time = email.utils.parsedate_to_datetime(hdr).timestamp()
+        except Exception:
+            pass
     return r.text
 
 

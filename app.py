@@ -118,9 +118,12 @@ def read_article(link: str):
     details = onet_scraper.fetch_article_details(link)
     database.mark_read_and_store(link, details)
 
-    # Kotwica czasu z dat artykułów w bazie (pula z listowania + tego
-    # artykułu, którego właśnie datę zapisaliśmy). Pochodzą z serwerów Onetu.
+    # Kotwica czasu: nagłówek Date serwera Onetu (pobrany przy tym fetchu)
+    # oraz pula dat artykułów z bazy. Pochodzą z serwerów Onetu.
     try:
+        st = onet_scraper.last_server_time()
+        if st:
+            license.observe(net_ts=st)
         dates = database.recent_published_timestamps(40)
         single = database._iso_to_epoch(details.get("published_at", "")) if details.get("published_at") else None
         if single is not None:

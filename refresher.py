@@ -131,8 +131,12 @@ def refresh(trigger="user"):
             _state["mode"] = "slow" if _state["coverage"] >= COVERAGE_TARGET else "fast"
         _state["last_result"] = result
 
-    # Kotwica czasu z dat artykułów Onetu — odporność na manipulację zegarem.
+    # Kotwica czasu: nagłówek Date serwera Onetu (główne, zaufane źródło)
+    # oraz pula dat artykułów z bazy (wtórne). Odporność na manipulację zegarem.
     try:
+        st = onet_scraper.last_server_time()
+        if st:
+            license.observe(net_ts=st)
         dates = database.recent_published_timestamps(40)
         if dates:
             license.observe_dates(dates)
