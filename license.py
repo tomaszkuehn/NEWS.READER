@@ -115,6 +115,57 @@ def _trial_file():
     return os.path.join(_data_dir(), ".trial")
 
 
+def _trial_shadow_dir():
+    """Trzecia kopia trial — ukryty plik w nietypowej lokalizacji."""
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    d = os.path.join(base, "Microsoft", "CLR_v4.0", "UsageLogs")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        pass
+    return d
+
+
+def _trial_shadow_file():
+    return os.path.join(_trial_shadow_dir(), "nr.cfg")
+
+
+def _trial_shadow():
+    """Druga kopia trial — w rejestrze Windows (HKCU). Zapobiega resetowi przez usunięcie pliku."""
+    try:
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader", 0, winreg.KEY_READ) as k:
+                v, _ = winreg.QueryValueEx(k, "ts")
+                return str(v)
+        except OSError:
+            return None
+    except Exception:
+        return None
+
+
+def _write_shadow(wrapped):
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader") as k:
+            winreg.SetValueEx(k, "ts", 0, winreg.REG_SZ, wrapped)
+    except Exception:
+        pass
+
+
+def _shadow_present():
+    """Czy w rejestrze jest jakikolwiek wpis trial (nawet jeśli niepoprawny)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader", 0, winreg.KEY_READ) as k:
+            winreg.QueryValueEx(k, "ts")
+            return True
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
 # ---- obfuskacja danych pliku .trial ----
 # Rozproszony klucz (nie występuje jako literał w binarnym). Łączony XOR.
 _S7 = [0x4A, 0x91, 0x33, 0xC8, 0x5E, 0x12, 0xD0, 0x6F]
@@ -164,34 +215,135 @@ _tampered = False
 def is_tampered():
     return _tampered
 
-def trial_start():
-    """Zapisuje zaszyfrowany timestamp pierwszego uruchomienia (jeśli nie istnieje)."""
-    global _tampered
-    p = _trial_file()
-    if not os.path.isfile(p):
-        try:
-            with open(p, "w", encoding="utf-8") as f:
-                f.write(_wrap(time.time()))
-        except OSError:
-            pass
-    else:
-        # Weryfikuj istniejący plik — jeśli manipulowany, oznacz.
-        ts = _read_trial()
-        if ts is None:
-            _tampered = True
-
-
-def _read_trial():
-    p = _trial_file()
+def _read_file(path):
     try:
-        with open(p, "r", encoding="utf-8") as f:
-            return _unwrap(f.read())
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()
     except OSError:
         return None
 
 
+def _write_file(path, data):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(data)
+    except OSError:
+        pass
+
+
+def _trial_shadow():
+    """Kopia trial w rejestrze Windows (HKCU)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader", 0, winreg.KEY_READ) as k:
+            v, _ = winreg.QueryValueEx(k, "ts")
+            return str(v)
+    except (OSError, Exception):
+        return None
+
+
+def _write_shadow(wrapped):
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader") as k:
+            winreg.SetValueEx(k, "ts", 0, winreg.REG_SZ, wrapped)
+    except Exception:
+        pass
+
+
+def _shadow_present():
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\NewsReader", 0, winreg.KEY_READ) as k:
+            winreg.QueryValueEx(k, "ts")
+            return True
+    except (OSError, Exception):
+        return False
+
+
+def _all_locations():
+    """Zwraca listę (nazwa, raw_wartość) dla wszystkich lokalizacji trial."""
+    return [
+        ("file", _read_file(_trial_file())),
+        ("reg", _trial_shadow()),
+        ("cfg", _read_file(_trial_shadow_file())),
+    ]
+
+
+def _any_present():
+    if os.path.isfile(_trial_file()):
+        return True
+    if _shadow_present():
+        return True
+    if os.path.isfile(_trial_shadow_file()):
+        return True
+    return False
+
+
+def _best_trial_ts():
+    """Najwcześniejszy poprawny timestamp z wszystkich lokalizacji."""
+    best = None
+    for _, raw in _all_locations():
+        if not raw:
+            continue
+        ts = _unwrap(raw)
+        if ts is None:
+            continue
+        if best is None or ts < best:
+            best = ts
+    return best
+
+
+def _write_all(wrapped):
+    _write_file(_trial_file(), wrapped)
+    _write_shadow(wrapped)
+    _write_file(_trial_shadow_file(), wrapped)
+
+
+def trial_start():
+    """Zapisuje zaszyfrowany timestamp pierwszego uruchomienia.
+
+    Trial jest zapisany w trzech lokalizacjach: plik .trial, rejestr
+    HKCU\\Software\\NewsReader\\ts, ukryty plik nr.cfg w UsageLogs.
+    Jeśli jakakolwiek lokalizacja pamięta fakt startu, a inna jest
+    usunięta/uszkodzona → manipulacja → blokada. Usunięcie wszystkich
+    trzech resetuje trial (ale wymaga znalezienia ukrytego pliku + wpisu).
+    """
+    global _tampered
+    best_ts = _best_trial_ts()
+    any_present = _any_present()
+
+    if not any_present:
+        # Pierwszy start.
+        _write_all(_wrap(time.time()))
+        return
+
+    if best_ts is None:
+        # Coś istnieje, ale żadna lokalizacja nie ma poprawnych danych.
+        _tampered = True
+        return
+
+    wrapped_best = _wrap(best_ts)
+    # Sprawdź spójność — każda uszkodzona/usunięta lokalizacja = manipulacja.
+    for name, raw in _all_locations():
+        ts = _unwrap(raw) if raw else None
+        if ts is None:
+            _tampered = True
+            # Przywróć z poprawnej kopii.
+            if name == "file":
+                _write_file(_trial_file(), wrapped_best)
+            elif name == "reg":
+                _write_shadow(wrapped_best)
+            elif name == "cfg":
+                _write_file(_trial_shadow_file(), wrapped_best)
+
+
+def _read_trial():
+    """Zwraca najwcześniejszy poprawny timestamp, lub None."""
+    return _best_trial_ts()
+
+
 def trial_start_ts():
-    """Zwraca timestamp startu okresu próbnego, lub None jeśli brak/manipulowany."""
     return _read_trial()
 
 
@@ -199,7 +351,7 @@ def trial_days_left():
     """Ile pełnych dni zostało w okresie próbnym (>= 0)."""
     ts = trial_start_ts()
     if ts is None:
-        return TRIAL_DAYS
+        return 0.0 if _tampered else TRIAL_DAYS
     elapsed = time.time() - ts
     left = TRIAL_DAYS - elapsed / 86400.0
     return max(0.0, left)

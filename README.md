@@ -351,6 +351,17 @@ powoduje niezgodność HMAC i aplikacja wykrywa **niedozwoloną modyfikację**,
 blokując odświeżanie (komunikat w pasku i modalu „O aplikacji"). Odblokowanie
 kluczem RSA nadal działa po wykryciu manipulacji.
 
+Trial jest zapisany w **trzech lokalizacjach** zapobiegających resetowi:
+
+1. **Plik** `.trial` w katalogu danych (`%APPDATA%\NewsReader`)
+2. **Rejestr Windows** `HKCU\Software\NewsReader\ts`
+3. **Ukryty plik** `%LOCALAPPDATA%\Microsoft\CLR_v4.0\UsageLogs\nr.cfg`
+
+Jeśli jakakolwiek lokalizacja pamięta fact startu, a inna jest usunięta
+lub uszkodzona → manipulacja → blokada. Usunięcie wszystkich trzech
+resetuje trial, ale wymaga znalezienia ukrytego pliku w katalogu
+`UsageLogs` i wpisu rejestru — przypadkowy użytkownik tego nie zrobi.
+
 Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
 kategoriami pojawia się przypomnienie. Po upływie — komunikat o blokadzie.
 
