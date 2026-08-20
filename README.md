@@ -371,15 +371,18 @@ trial — ale to wymaga świadomego poszukiwania i usunięcia ukrytych wpisów.
 Odblokowanie kluczem RSA działa w każdym przypadku.
 
 Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
-kategoriami pojawia się przypomnienie. Przy ręcznym odświeżaniu komunikaty
-w pasku stanu:
+kategoriami pojawia się przypomnienie. Przy ręcznym odświeżaniu pojawia się
+**blokujące okno modalne** w kontrastowych kolorach (żółto-czarne ostrzeżenie
+lub czerwono-białe zablokowanie), które trzeba zamknąć przyciskiem „Rozumiem",
+zanim można kontynuować:
 
 - **Przed upływem** (raz na 24 h przy kliknięciu „Odśwież"): „To wersja próbna.
-  Bez aktywacji przestanie działać za X dni."
+  Bez aktywacji przestanie działać za X dni." (tryb ostrzeżenia).
 - **Po upływie okresu próbnego**: „Czas na testowanie aplikacji upłynął.
-  Proszę o aktywowanie aplikacji." (przy każdym kliknięciu „Odśwież").
+  Proszę o aktywowanie aplikacji." (tryb zablokowania, przy każdym kliknięciu
+  „Odśwież").
 - **Po wykryciu manipulacji**: „Niedozwolona modyfikacja plików aplikacji —
-  wprowadź klucz aktywacyjny, aby korzystać dalej."
+  wprowadź klucz aktywacyjny, aby korzystać dalej." (tryb zablokowania).
 
 W modalu **„O aplikacji"** (menu ustawień → „O aplikacji") dostępna jest
 sekcja klucza z **kodem systemu** (stabilny identyfikator maszyny,

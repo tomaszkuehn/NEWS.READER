@@ -333,6 +333,29 @@
   .about-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
   .about-section h4 { margin: 0 0 8px; font-size: 15px; }
   .about-section .muted { font-size: 12.5px; margin: 0 0 12px; }
+
+  /* ===== Trial notice modal (blocking, high-contrast) ===== */
+  #trial-modal { background: rgba(0,0,0,.6); }
+  .trial-box {
+    max-width: 480px; width: calc(100% - 32px);
+    padding: 26px; border-radius: var(--radius); border: 3px solid;
+    text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .trial-box h3 { margin: 0 0 12px; font-size: 21px; font-weight: 800; letter-spacing: .3px; }
+  .trial-box p { margin: 0 0 20px; font-size: 15px; line-height: 1.55; font-weight: 600; }
+  .trial-box.warn { background: #ffeb3b; border-color: #000; color: #000; }
+  .trial-box.warn h3 { color: #b71c1c; }
+  .trial-box.block { background: #c62828; border-color: #fff; color: #fff; }
+  .trial-box.block h3 { color: #fff; }
+  .trial-box .modal-actions { justify-content: center; }
+  .trial-box button.primary {
+    font-weight: 700; padding: 10px 24px; font-size: 14px;
+    background: #000; color: #ffeb3b; border: 2px solid #000; border-radius: 8px;
+    cursor: pointer;
+  }
+  .trial-box.block button.primary { background: #fff; color: #c62828; border-color: #fff; }
+  .trial-box button.primary:hover { filter: brightness(1.15); }
+
 </style>
 </head>
 <body>
@@ -430,6 +453,16 @@
 
     <div class="modal-actions">
       <button id="about-close" type="button" class="primary">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div id="trial-modal" class="modal-overlay" style="display:none">
+  <div id="trial-box" class="trial-box warn">
+    <h3 id="trial-title">Uwaga</h3>
+    <p id="trial-msg"></p>
+    <div class="modal-actions">
+      <button id="trial-close" type="button" class="primary">Rozumiem</button>
     </div>
   </div>
 </div>
@@ -675,9 +708,9 @@ async function refresh() {
     const st = await (await fetch("/api/status")).json();
     if (!st.active) {
       if (st.tampered) {
-        setNote("Niedozwolona modyfikacja plików aplikacji — wprowadź klucz aktywacyjny, aby korzystać dalej");
+        showTrialNotice("block", "Niedozwolona modyfikacja", "Wykryto niedozwoloną modyfikację plików aplikacji. Wprowadź klucz aktywacyjny, aby korzystać dalej.");
       } else {
-        setNote("Czas na testowanie aplikacji upłynął. Proszę o aktywowanie aplikacji.");
+        showTrialNotice("block", "Okres próbny upłynął", "Czas na testowanie aplikacji upłynął. Proszę o aktywowanie aplikacji.");
       }
       checkStatus();
       return;
@@ -725,7 +758,7 @@ function notifyTrialInfo(st) {
   const last = parseInt(localStorage.getItem(TRIAL_NOTIFY_KEY) || "0", 10);
   if (now - last < 24 * 3600 * 1000) return;
   const dni = Math.ceil(st.trial_days_left);
-  setNote(`To wersja próbna. Bez aktywacji przestanie działać za ${dni} ${dni === 1 ? "dzień" : "dni"}.`);
+  showTrialNotice("warn", "Wersja próbna", `To wersja próbna. Bez aktywacji przestanie działać za ${dni} ${dni === 1 ? "dzień" : "dni"}.`);
   localStorage.setItem(TRIAL_NOTIFY_KEY, String(now));
 }
 
@@ -1056,6 +1089,19 @@ $("about-close").addEventListener("click", closeAboutModal);
 $("about-modal").addEventListener("click", (e) => {
   if (e.target.id === "about-modal") closeAboutModal();
 });
+
+function showTrialNotice(kind, title, msg) {
+  const box = $("trial-box");
+  box.className = "trial-box " + (kind === "block" ? "block" : "warn");
+  $("trial-title").textContent = title;
+  $("trial-msg").textContent = msg;
+  $("trial-modal").style.display = "flex";
+  $("trial-close").focus();
+}
+function closeTrialNotice() {
+  $("trial-modal").style.display = "none";
+}
+$("trial-close").addEventListener("click", closeTrialNotice);
 $("unlock-submit").addEventListener("click", async () => {
   const key = $("unlock-key").value.trim();
   const errEl = $("unlock-error");
