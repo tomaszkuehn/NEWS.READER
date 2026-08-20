@@ -516,6 +516,16 @@ def trial_expired():
     return _tampered or trial_days_left() <= 0
 
 
+def estimated_now():
+    """Bieżący szacowany czas: kotwica sieciowa (daty artykułów Onetu),
+    jeśli dostępna, w przeciwnym razie zegar lokalny. Służy do pokazywania
+    'wykrytej daty' w oknie O aplikacji."""
+    st = _read_state()
+    if st and st.get("net") is not None:
+        return st["net"]
+    return time.time()
+
+
 def is_unlocked():
     """Czy aplikacja została odblokowana (klucz zapisany i poprawny)."""
     p = _unlock_file()

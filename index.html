@@ -426,6 +426,7 @@
       <div class="about-stats">
         <div><span class="muted">Okres próbny:</span> <strong id="about-trial">—</strong></div>
         <div><span class="muted">Status:</span> <strong id="about-status">—</strong></div>
+        <div><span class="muted">Wykryta data (est.):</span> <strong id="about-est">—</strong></div>
       </div>
     </div>
 
@@ -521,6 +522,13 @@ function fmt(iso) {
   if (d.toDateString() === today.toDateString()) {
     return d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
   }
+  return d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtEpoch(epoch) {
+  if (!epoch) return "—";
+  const d = new Date(epoch * 1000);
+  if (isNaN(d.getTime())) return "—";
   return d.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -1065,6 +1073,13 @@ function openAboutModal() {
   } else {
     trialEl.textContent = "—";
     statusEl.textContent = "—";
+  }
+  const estEl = $("about-est");
+  if (s && s.est_now) {
+    const days = s.unlocked ? null : Math.max(0, Math.ceil(s.trial_days_left));
+    estEl.textContent = fmtEpoch(s.est_now) + (days != null ? `  ·  pozostało ${days} dni do aktywacji` : "");
+  } else {
+    estEl.textContent = "—";
   }
   const unlockSection = $("about-unlock");
   const unlockedSection = $("about-unlocked");
