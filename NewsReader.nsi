@@ -75,6 +75,22 @@ Function .onInit
   onInit_done:
 FunctionEnd
 
+; Zatrzymuje działającą aplikację i czeka, aż plik exe zostanie
+; odblokowany (pętla — system zwalnia uchwyt z opóźnieniem).
+Function CloseRunningApp
+  nsExec::Exec 'taskkill /IM "${PRODUCT_FILE}" /F /T'
+  StrCpy $R0 0
+cra_loop:
+  Sleep 500
+  Delete "$INSTDIR\${PRODUCT_FILE}"
+  IfErrors cra_retry cra_done
+cra_retry:
+  IntOp $R0 $R0 + 1
+  IntCmp $R0 30 cra_timeout cra_loop cra_loop
+cra_timeout:
+cra_done:
+FunctionEnd
+
 ; tekst strony powitalnej zależny od trybu (instalacja / aktualizacja)
 Function WelcomeShow
   StrCmp $IsUpgrade 1 0 wsh_done
@@ -89,8 +105,10 @@ Section "News Reader" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; przy aktualizacji zatrzymaj działającą aplikację — działający exe jest
-  ; zablokowany przez Windows i nie dałby się nadpisać
-  nsExec::Exec 'taskkill /IM "${PRODUCT_FILE}" /F'
+  ; zablokowany przez Windows i nie dałby się nadpisać. Zabij (drzewo /T)
+  ; i poczekaj, aż plik zostanie odblokowany — zwolnienie uchwytu przez
+  ; system bywa opóźnione, co powodowało błąd "otwarcia pliku do zapisu".
+  Call CloseRunningApp
 
   File "dist\${PRODUCT_FILE}"
 
