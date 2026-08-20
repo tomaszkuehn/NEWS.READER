@@ -372,7 +372,7 @@ Odblokowanie kluczem RSA działa w każdym przypadku.
 
 Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
 kategoriami pojawia się przypomnienie. Przy ręcznym odświeżaniu pojawia się
-**blokujące okno modalne** w kontrastowych kolorach (żółto-czarne ostrzeżenie
+**blokujące okno modalne** w kontrastowych kolorach (biało-czarne ostrzeżenie
 lub czerwono-białe zablokowanie), które trzeba zamknąć przyciskiem „Rozumiem",
 zanim można kontynuować:
 
