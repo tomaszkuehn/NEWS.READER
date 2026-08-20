@@ -662,6 +662,7 @@ function updateRefreshNote() {
   else setNote(`Odświeżono ✓ (${mins} min temu)${covTxt}`);
 }
 setInterval(updateRefreshNote, 30000);
+setInterval(loadCounts, 300000);
 
 async function refresh() {
   const btn = $("refresh");

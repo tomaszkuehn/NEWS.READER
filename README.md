@@ -235,6 +235,9 @@ publikacji fallbackiem jest `first_seen` (pierwsze znalezienie w bazie).
 - Feed `wiadomosci.onet.pl/najnowsze` jest zapisywany jako `wiadomosci`
   (konfiguracja `"category": "wiadomosci"`), więc też świeci w „Najnowsze"
   tylko w oknie 2h, a potem żyje jako zwykłe wiadomości.
+- **Liczniki przy zakładkach** są odświeżane automatycznie co 5 minut
+  (`setInterval(loadCounts, 300000)`), aby licznik „Najnowsze" aktualizował
+  się gdy artykuły wypadają z okna 2h — bez ręcznego odświeżania.
 
 ## Jakie artykuły są zapisywane
 
