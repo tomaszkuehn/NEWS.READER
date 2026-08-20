@@ -672,8 +672,22 @@ async function refresh() {
   btn.textContent = "Pobieranie...";
   setNote("Skanowanie serwisów Onetu…");
   try {
+    const st = await (await fetch("/api/status")).json();
+    if (!st.active) {
+      if (st.tampered) {
+        setNote("Niedozwolona modyfikacja plików aplikacji — wprowadź klucz aktywacyjny, aby korzystać dalej");
+      } else {
+        setNote("Czas na testowanie aplikacji upłynął. Proszę o aktywowanie aplikacji.");
+      }
+      checkStatus();
+      return;
+    }
     const r = await fetch("/api/refresh", { method: "POST" });
     const res = await r.json();
+    if (!r.ok) {
+      setNote(res.detail || "Odświeżanie zablokowane");
+      return;
+    }
     if (res.status === "waiting" || res.status === "quota") {
       await waitForRefresh(res);
       return;
@@ -689,6 +703,7 @@ async function refresh() {
     await loadCounts();
     await loadArticles();
     console.log("Odświeżono:", res);
+    notifyTrialInfo(st);
   } catch (e) {
     setNote("Błąd odświeżania");
     if (e.message && e.message.includes("403")) {
@@ -701,6 +716,17 @@ async function refresh() {
     btn.disabled = false;
     btn.textContent = "Odśwież";
   }
+}
+
+const TRIAL_NOTIFY_KEY = "trial_notify_at";
+function notifyTrialInfo(st) {
+  if (st.unlocked) return;
+  const now = Date.now();
+  const last = parseInt(localStorage.getItem(TRIAL_NOTIFY_KEY) || "0", 10);
+  if (now - last < 24 * 3600 * 1000) return;
+  const dni = Math.ceil(st.trial_days_left);
+  setNote(`To wersja próbna. Bez aktywacji przestanie działać za ${dni} ${dni === 1 ? "dzień" : "dni"}.`);
+  localStorage.setItem(TRIAL_NOTIFY_KEY, String(now));
 }
 
 function fmtWait(sec) {
