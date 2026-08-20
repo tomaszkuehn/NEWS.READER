@@ -261,6 +261,30 @@ def _shadow_present():
         return False
 
 
+def _installed_flag():
+    """Czy aplikacja była już kiedyś instalowana (zapobiega resetowi trial przez reinstalację).
+
+    Zapisane w osobnym kluczu rejestru (Software\\Microsoft\\CLR_v4.0\\NativeImages\\nr)
+    — nietypowa lokalizacja, trudna do znalezienia przypadkowo.
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\CLR_v4.0\NativeImages\nr", 0, winreg.KEY_READ) as k:
+            v, _ = winreg.QueryValueEx(k, "v")
+            return int(v) == 1
+    except (OSError, Exception):
+        return False
+
+
+def _write_installed():
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\CLR_v4.0\NativeImages\nr") as k:
+            winreg.SetValueEx(k, "v", 0, winreg.REG_DWORD, 1)
+    except Exception:
+        pass
+
+
 def _all_locations():
     """Zwraca listę (nazwa, raw_wartość) dla wszystkich lokalizacji trial."""
     return [
@@ -301,41 +325,59 @@ def _write_all(wrapped):
 
 
 def trial_start():
-    """Zapisuje zaszyfrowany timestamp pierwszego uruchomienia.
+    """Inicjalizuje i weryfikuje okres próbny.
 
     Trial jest zapisany w trzech lokalizacjach: plik .trial, rejestr
     HKCU\\Software\\NewsReader\\ts, ukryty plik nr.cfg w UsageLogs.
-    Jeśli jakakolwiek lokalizacja pamięta fakt startu, a inna jest
-    usunięta/uszkodzona → manipulacja → blokada. Usunięcie wszystkich
-    trzech resetuje trial (ale wymaga znalezienia ukrytego pliku + wpisu).
+    Dodatkowo rejestr przechowuje flagę 'installed' (zapisaną raz, nigdy
+    nie usuwaną) — zapobiega resetowi trial przez reinstalację.
+
+    Zasady:
+    - Brak wszystkich lokalizacji + brak flagi installed → pierwszy start (nowy trial).
+    - Brak wszystkich lokalizacji + flaga installed → blokada (reset przez usunięcie).
+    - Brak/uszkodzenie jakiejkolwiek lokalizacji (ale inne istnieją) → blokada.
+    - Wszystkie poprawne → normalne działanie.
     """
     global _tampered
-    best_ts = _best_trial_ts()
-    any_present = _any_present()
+    locs = _all_locations()
+    valid_count = sum(1 for _, raw in locs if raw and _unwrap(raw) is not None)
+    present_count = sum(1 for _, raw in locs if raw is not None)
+    installed = _installed_flag()
 
-    if not any_present:
-        # Pierwszy start.
+    if present_count == 0 and not installed:
+        # Pierwszy start w życiu — utwórz trial wszędzie + flagę installed.
         _write_all(_wrap(time.time()))
+        _write_installed()
         return
 
-    if best_ts is None:
-        # Coś istnieje, ale żadna lokalizacja nie ma poprawnych danych.
+    if present_count == 0 and installed:
+        # Wszystko usunięte, ale aplikacja była instalowana → blokada.
         _tampered = True
         return
 
-    wrapped_best = _wrap(best_ts)
-    # Sprawdź spójność — każda uszkodzona/usunięta lokalizacja = manipulacja.
-    for name, raw in _all_locations():
-        ts = _unwrap(raw) if raw else None
-        if ts is None:
-            _tampered = True
-            # Przywróć z poprawnej kopii.
-            if name == "file":
-                _write_file(_trial_file(), wrapped_best)
-            elif name == "reg":
-                _write_shadow(wrapped_best)
-            elif name == "cfg":
-                _write_file(_trial_shadow_file(), wrapped_best)
+    # Coś istnieje — sprawdź spójność.
+    best_ts = _best_trial_ts()
+    if best_ts is None:
+        # Żadna lokalizacja nie ma poprawnych danych, ale coś istnieje.
+        _tampered = True
+        _write_installed()
+        return
+
+    # Sprawdź czy wszystkie trzy są poprawne.
+    if valid_count != 3:
+        _tampered = True
+        wrapped_best = _wrap(best_ts)
+        for name, raw in locs:
+            ts = _unwrap(raw) if raw else None
+            if ts is None:
+                if name == "file":
+                    _write_file(_trial_file(), wrapped_best)
+                elif name == "reg":
+                    _write_shadow(wrapped_best)
+                elif name == "cfg":
+                    _write_file(_trial_shadow_file(), wrapped_best)
+
+    _write_installed()
 
 
 def _read_trial():

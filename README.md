@@ -357,10 +357,18 @@ Trial jest zapisany w **trzech lokalizacjach** zapobiegających resetowi:
 2. **Rejestr Windows** `HKCU\Software\NewsReader\ts`
 3. **Ukryty plik** `%LOCALAPPDATA%\Microsoft\CLR_v4.0\UsageLogs\nr.cfg`
 
-Jeśli jakakolwiek lokalizacja pamięta fact startu, a inna jest usunięta
-lub uszkodzona → manipulacja → blokada. Usunięcie wszystkich trzech
-resetuje trial, ale wymaga znalezienia ukrytego pliku w katalogu
-`UsageLogs` i wpisu rejestru — przypadkowy użytkownik tego nie zrobi.
+Dodatkowo flaga `installed` jest zapisana w **osobnym kluczu rejestru**
+`HKCU\Software\Microsoft\CLR_v4.0\NativeImages\nr` (nietypowa lokalizacja,
+trudna do znalezienia przypadkowo). Flaga jest zapisywana raz przy pierwszym
+starcie i **nigdy nie jest usuwana** — zapobiega resetowi trial przez
+usunięcie wszystkich plików trial lub reinstalację aplikacji.
+
+Jeśli **jakakolwiek** z trzech lokalizacji trial jest usunięta lub uszkodzona
+→ manipulacja → blokada. Jeśli **wszystkie trzy** są usunięte, ale flaga
+`installed` istnieje → blokada (reset przez usunięcie). Tylko pełne
+wyczyszczenie wszystkiego (włącznie z kluczem `NativeImages\nr`) resetuje
+trial — ale to wymaga świadomego poszukiwania i usunięcia ukrytych wpisów.
+Odblokowanie kluczem RSA działa w każdym przypadku.
 
 Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
 kategoriami pojawia się przypomnienie. Po upływie — komunikat o blokadzie.
