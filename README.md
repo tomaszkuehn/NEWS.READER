@@ -298,6 +298,9 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 
 ## Interfejs
 
+- **Favicon** — glob (biały na niebieskim tle `#1976d2`) jako inline SVG
+  data URI w `<link rel="icon">` — widoczny w karcie przeglądarki bez
+  dodatkowego pliku.
 - **Layout aplikacji** — cała strona ma `height: 100vh; overflow: hidden`
   (model aplikacji, nie dokumentu). Tylko **lista artykułów** (`#list`) i
   **treść podglądu** (`#preview-body`) mają własne pionowe scrolle;
