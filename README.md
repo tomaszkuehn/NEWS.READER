@@ -334,7 +334,7 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
   (gdy aplikacja nie jest odblokowana).
 - **Czas odświeżenia** — po odświeżeniu w pasku pod kategoriami pojawia się
   „Odświeżono ✓ (X min temu)"; licznik jest aktualizowany co 30 s.
-- **Stopka** — zawiera informację o prawach autorskich: „(C) Tomasz Kuehn 2026".
+- **Stopka** — zawiera informację o prawach autorskich: „(C) Herr K. 2026".
 
 ## Okres próbny i klucz odblokowujący
 
