@@ -118,7 +118,7 @@ def _trigger_refresh():
         # Rozproszony punkt weryfikacji — tray (ikona zasobnika) również sprawdza.
         if not license.check_pubkey():
             return
-        if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+        if not license.is_active():
             return
         refresher.refresh(trigger="user")
     except Exception:

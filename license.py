@@ -1,16 +1,19 @@
 """Weryfikacja klucza odblokowujacego dalsze pobieranie artykułów.
 
-Model: offline RSA (PKCS#1 v1.5).
-- Keygen (u autora) ma klucz prywatny RSA, podpisuje kod systemu → klucz.
+Model: okres próbny (30 dni) + offline RSA (PKCS#1 v1.5).
+- Przy pierwszym uruchomieniu zapisywany jest timestamp w .trial.
+- Przez 30 dni aplikacja działa bez ograniczeń.
+- Po upływie 30 dni odświeżanie jest blokowane (przeglądanie nadal działa).
+- Odblokowanie: keygen (u autora) podpisuje kod systemu RSA → klucz.
 - Aplikacja weryfikuje podpis wbudowanym kluczem publicznym.
 - Atakujący po dekompilacji ma klucz publiczny, ale nie prywatnego —
   nie wygeneruje klucza bez podmiany klucza publicznego w exe.
 
-Anti-tamper: hash klucza publicznego zaszyty w refresher._pubkey_guard().
-Sprawdzany przy starcie — wykrywa podmianę klucza publicznego.
+Anti-tamper: rozproszone bajty klucza publicznego zaszyte w license.py.
+Sprawdzane przy starcie — wykrywa podmianę klucza publicznego.
 
 Rozproszone punkty weryfikacji: app.py, refresher.py, tray.py — każdy
-wywołuje license.is_unlocked() niezależnie, więc atakujący musi znaleźć
+wywołuje license.is_active() niezależnie, więc atakujący musi znaleźć
 i załatać wszystkie punkty blokady, a nie jeden if.
 """
 
@@ -18,13 +21,14 @@ import base64
 import hashlib
 import os
 import sys
+import time
 import uuid
 
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 
-LIMIT = 4000
+TRIAL_DAYS = 30
 
 # Klucz publiczny RSA (2048-bit, PEM bez nagłówków, base64).
 # Klucz prywatny NIE jest wbudowany w aplikację — tylko w keygen.py u autora.
@@ -94,13 +98,56 @@ def verify(code, key_b64):
         return False
 
 
-def _unlock_file():
-    d = os.path.dirname(os.path.abspath(__file__))
+def _data_dir():
     if getattr(sys, "frozen", False):
         base = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "NewsReader")
         os.makedirs(base, exist_ok=True)
-        d = base
-    return os.path.join(d, ".unlock")
+        return base
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _unlock_file():
+    return os.path.join(_data_dir(), ".unlock")
+
+
+def _trial_file():
+    return os.path.join(_data_dir(), ".trial")
+
+
+def trial_start():
+    """Zapisuje timestamp pierwszego uruchomienia (jeśli nie istnieje)."""
+    p = _trial_file()
+    if not os.path.isfile(p):
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(str(time.time()))
+        except OSError:
+            pass
+
+
+def trial_start_ts():
+    """Zwraca timestamp startu okresu próbnego, lub None jeśli brak."""
+    p = _trial_file()
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return float(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def trial_days_left():
+    """Ile pełnych dni zostało w okresie próbnym (>= 0)."""
+    ts = trial_start_ts()
+    if ts is None:
+        return TRIAL_DAYS
+    elapsed = time.time() - ts
+    left = TRIAL_DAYS - elapsed / 86400.0
+    return max(0.0, left)
+
+
+def trial_expired():
+    """True jeśli okres próbny minął."""
+    return trial_days_left() <= 0
 
 
 def is_unlocked():
@@ -118,6 +165,11 @@ def is_unlocked():
         return False
 
 
+def is_active():
+    """Czy aplikacja może pobierać artykuły: odblokowana LUB w okresie próbnym."""
+    return is_unlocked() or not trial_expired()
+
+
 def store_key(key):
     """Zapisuje klucz (weryfikacja przy is_unlocked)."""
     p = _unlock_file()
@@ -133,7 +185,7 @@ def clear_key():
 
 
 def pubkey_integrity():
-    """Zwraca hash klucza publicznego — używane przez refresher._pubkey_guard()."""
+    """Zwraca hash klucza publicznego (compat, używane wstarszych wersjach)."""
     return hashlib.sha256(_PUBKEY_B64.encode("ascii")).hexdigest()
 
 

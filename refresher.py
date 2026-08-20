@@ -143,9 +143,9 @@ def _auto_loop():
         else:
             cadence = SLOW_CADENCE_SECONDS + random.uniform(-60, 60)
         time.sleep(max(cadence, 1))
-        # Nie scrapuj, gdy baza osiągnęła limit i nie wprowadzono klucza.
+        # Nie scrapuj, gdy okres próbny minął i nie wprowadzono klucza.
         try:
-            if database.count_articles() >= license.LIMIT and not license.is_unlocked():
+            if not license.is_active():
                 continue
             # Rozproszony punkt anti-tamper — jeśli klucz publiczny podmieniony,
             # nie scrapuj (drugi niezależny check poza app.startup).

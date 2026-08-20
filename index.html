@@ -401,15 +401,14 @@
       <p>Czytnik wiadomości pobieranych z <strong>onet.pl</strong>.</p>
       <p class="muted">News Reader · (C) Tomasz Kuehn 2026</p>
       <div class="about-stats">
-        <div><span class="muted">Artykuły w bazie:</span> <strong id="about-count">—</strong></div>
-        <div><span class="muted">Limit:</span> <strong id="about-limit">—</strong></div>
+        <div><span class="muted">Okres próbny:</span> <strong id="about-trial">—</strong></div>
         <div><span class="muted">Status:</span> <strong id="about-status">—</strong></div>
       </div>
     </div>
 
     <div id="about-unlock" class="about-section" style="display:none">
       <h4>Klucz odblokowujący</h4>
-      <p class="muted">Wprowadź klucz powiązany z kodem Twojego systemu, aby podnieść limit artykułów. Możesz to zrobić prewencyjnie — przed osiągnięciem limitu.</p>
+      <p class="muted">Wprowadź klucz powiązany z kodem Twojego systemu, aby odblokować aplikację po upływie okresu próbnego. Możesz to zrobić prewencyjnie.</p>
       <div class="modal-field">
         <label for="unlock-code">Kod systemu:</label>
         <input id="unlock-code" type="text" readonly>
@@ -426,7 +425,7 @@
 
     <div id="about-unlocked" class="about-section" style="display:none">
       <h4>Klucz odblokowujący</h4>
-      <p class="muted">Aplikacja jest odblokowana. Limit artykułów nie obowiązuje.</p>
+      <p class="muted">Aplikacja jest odblokowana. Okres próbny nie obowiązuje.</p>
     </div>
 
     <div class="modal-actions">
@@ -973,8 +972,10 @@ async function checkStatus() {
     const r = await fetch("/api/status");
     const s = await r.json();
     lastStatus = s;
-    if (s.locked) {
-      setNote(`Osiągnięto limit ${s.limit} artykułów — wprowadź klucz, aby kontynuować pobieranie`);
+    if (s.trial_expired && !s.unlocked) {
+      setNote(`Okres próbny minął — wprowadź klucz, aby kontynuować pobieranie`);
+    } else if (!s.unlocked && s.trial_days_left <= 5) {
+      setNote(`Okres próbny: ${Math.ceil(s.trial_days_left)} dni zostało — wprowadź klucz, aby kontynuować po upływie`);
     }
     return s;
   } catch (e) {
@@ -984,14 +985,21 @@ async function checkStatus() {
 
 function openAboutModal() {
   const s = lastStatus;
-  $("about-count").textContent = s ? s.article_count : "—";
-  $("about-limit").textContent = s ? s.limit : "—";
+  const trialEl = $("about-trial");
   const statusEl = $("about-status");
   if (s) {
-    if (s.unlocked) statusEl.textContent = "odblokowany";
-    else if (s.locked) statusEl.textContent = "zablokowany (limit osiągnięty)";
-    else statusEl.textContent = `aktywny (poniżej limitu)`;
+    if (s.unlocked) {
+      trialEl.textContent = "odblokowany";
+      statusEl.textContent = "odblokowany";
+    } else if (s.trial_expired) {
+      trialEl.textContent = "minął";
+      statusEl.textContent = "zablokowany (okres próbny minął)";
+    } else {
+      trialEl.textContent = `${Math.ceil(s.trial_days_left)} dni (z ${s.trial_days})`;
+      statusEl.textContent = "aktywny (okres próbny)";
+    }
   } else {
+    trialEl.textContent = "—";
     statusEl.textContent = "—";
   }
   const unlockSection = $("about-unlock");

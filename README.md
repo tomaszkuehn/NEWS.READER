@@ -336,15 +336,22 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
   „Odświeżono ✓ (X min temu)"; licznik jest aktualizowany co 30 s.
 - **Stopka** — zawiera informację o prawach autorskich: „(C) Tomasz Kuehn 2026".
 
-## Limit artykułów i klucz odblokowujący
+## Okres próbny i klucz odblokowujący
 
-Gdy baza osiągnie **4000 artykułów**, dalsze pobieranie z Onetu jest
-blokowane — ręczne (`/api/refresh`) i automatyczne (pętla `refresher`).
+Aplikacja działa bez ograniczeń przez **30 dni** od pierwszego uruchomienia
+(`TRIAL_DAYS`, `license.trial_start`). Timestamp pierwszego startu jest
+zapisywany w pliku `.trial` (katalog danych aplikacji,
+`%APPDATA%\NewsReader` w wersji instalacyjnej). Po upływie 30 dni
+**odświeżanie** artykułów (ręczne i automatyczne) jest blokowane —
+przeglądanie zapisanych artykułów nadal działa.
+
+Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
+kategoriami pojawia się przypomnienie. Po upływie — komunikat o blokadzie.
+
 W modalu **„O aplikacji"** (menu ustawień → „O aplikacji") dostępna jest
 sekcja klucza z **kodem systemu** (stabilny identyfikator maszyny,
 wyliczony z `MachineGuid` Windowsa, w trybie dev z MAC adresu). Klucz
-można wprowadzić **prewencyjnie** — przed osiągnięciem limitu. Gdy limit
-został osiągnięty, w pasku pod kategoriami pojawia się stosowny komunikat.
+można wprowadzić **prewencyjnie** — przed upływem okresu próbnego.
 
 Aby odblokować aplikację, należy:
 
@@ -359,8 +366,7 @@ Klucz jest podpisany **RSA (PKCS#1 v1.5, 2048-bit)** kluczem prywatnym
 (`keys/private.pem`, tylko u autora). Aplikacja weryfikuje podpis
 wbudowanym **kluczem publicznym** (`license._PUBKEY_B64`) — bez klucza
 prywatnego nie da się wygenerować poprawnego klucza. Poprawny klucz jest
-zapisywany w pliku `.unlock` (katalog danych aplikacji,
-`%APPDATA%\NewsReader` w wersji instalacyjnej) i przeżywa restarty.
+zapisywany w pliku `.unlock` (katalog danych aplikacji) i przeżywa restarty.
 Klucz jest powiązany z kodem systemu (MachineGuid), więc jest ważny tylko
 na tej maszynie.
 
@@ -373,8 +379,8 @@ na tej maszynie.
   publicznego zaszytych w `license.py` (zaciemnionych operacjami bitowymi).
   `license.check_pubkey()` weryfikuje integralność — wykrywa podmianę
   klucza publicznego w exe.
-- **Rozproszone punkty weryfikacji** — blokada limitu i anti-tamper są
-  sprawdzane w trzech modułach niezależnie: `app.py` (startup + refresh),
+- **Rozproszone punkty weryfikacji** — blokada okresu próbnego i anti-tamper
+  są sprawdzane w trzech modułach niezależnie: `app.py` (startup + refresh),
   `refresher.py` (pętla auto), `tray.py` (refresh z zasobnika). Atakujący
   musi znaleźć i załatać wszystkie punkty, a nie jeden `if`.
 - **Klucz powiązany z maszyną** — kod systemu z `MachineGuid` (Windows) /

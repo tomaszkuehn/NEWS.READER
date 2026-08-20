@@ -24,6 +24,7 @@ def startup():
     database.init_db()
     database.migrate_article_keys(onet_scraper.article_key)
     onet_scraper.migrate_legacy_categories()
+    license.trial_start()
     # Anti-tamper: jeśli klucz publiczny został podmieniony, nie startuj refreshera.
     if not license.check_pubkey():
         return
@@ -39,17 +40,16 @@ def categories():
 
 @app.get("/api/status")
 def system_status():
-    """Stan licencji: licznik artykułów, blokada, kod systemu."""
-    count = database.count_articles()
+    """Stan licencji: okres próbny, blokada, kod systemu."""
     unlocked = license.is_unlocked()
-    locked = count >= license.LIMIT and not unlocked
-    # Kod systemu zawsze dostępny — użytkownik może wprowadzić klucz
-    # prewencyjnie (zanim baza osiągnie limit).
+    active = license.is_active()
+    days_left = license.trial_days_left()
     return {
-        "article_count": count,
-        "limit": license.LIMIT,
-        "locked": locked,
+        "active": active,
         "unlocked": unlocked,
+        "trial_days_left": round(days_left, 1),
+        "trial_expired": license.trial_expired(),
+        "trial_days": license.TRIAL_DAYS,
         "system_code": license.system_code() if not unlocked else None,
     }
 
@@ -66,8 +66,8 @@ def unlock(req: UnlockReq):
 @app.post("/api/refresh")
 def refresh():
     """Odświeża artykuły z throttlingiem (min. 140 s między odświeżeniami)."""
-    if database.count_articles() >= license.LIMIT and not license.is_unlocked():
-        raise HTTPException(403, "Osiągnięto limit artykułów — wprowadź klucz, aby kontynuować")
+    if not license.is_active():
+        raise HTTPException(403, "Okres próbny minął — wprowadź klucz, aby kontynuować")
     return refresher.refresh(trigger="user")
 
 @app.get("/api/refresh/status")

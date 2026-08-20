@@ -7,6 +7,7 @@ articles.db
 # Klucze RSA (prywatny NIE w repo — tylko u autora)
 keys/
 .unlock
+.trial
 
 # Losowy identyfikator przeglądarki (generowany per-instalacja)
 browser_identity.txt
