@@ -226,6 +226,38 @@ def set_favorite(link, is_favorite):
         )
 
 
+def recent_published_timestamps(limit=40):
+    """Zwraca listę timestampów epoch (UTC) dat publikacji artykułów,
+    posortowaną malejąco (najnowsze pierwsze). Używana jako zaufana
+    kotwica czasu (daty pochodzą z serwerów Onetu, nie z zegara użytkownika).
+    Artykuły bez daty są pomijane."""
+    import time as _time
+    from datetime import datetime, timezone
+    out = []
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT published_at FROM articles WHERE published_at <> '' "
+            "ORDER BY published_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    for r in rows:
+        ts = _iso_to_epoch(r["published_at"])
+        if ts is not None:
+            out.append(ts)
+    return out
+
+
+def _iso_to_epoch(iso):
+    try:
+        s = iso.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
 def cleanup_old():
     """Usuwa artykuły nieaktualizowane dłużej niż RETENTION_DAYS dni.
 

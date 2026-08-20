@@ -25,6 +25,11 @@ def startup():
     database.migrate_article_keys(onet_scraper.article_key)
     onet_scraper.migrate_legacy_categories()
     license.trial_start()
+    # Zlicz czas od ostatniego uruchomienia (odporność na cofnięcie zegara).
+    try:
+        license.observe()
+    except Exception:
+        pass
     # Anti-tamper: jeśli klucz publiczny został podmieniony, nie startuj refreshera.
     if not license.check_pubkey():
         return
@@ -107,6 +112,15 @@ def read_article(link: str):
 
     details = onet_scraper.fetch_article_details(link)
     database.mark_read_and_store(link, details)
+
+    # Kotwica czasu z daty otwartego artykułu (pochodzi z serwerów Onetu).
+    pa = details.get("published_at", "")
+    ts = database._iso_to_epoch(pa) if pa else None
+    if ts is not None:
+        try:
+            license.observe_dates([ts])
+        except Exception:
+            pass
 
     row = database.get_article_by_key(link)
     return {

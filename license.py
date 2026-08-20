@@ -184,8 +184,9 @@ def _hmac(data):
     import hmac as _h
     return _h.new(k, data, hashlib.sha256).digest()[:16]
 
-def _wrap(ts):
-    raw = struct.pack(">d", ts)
+def _wrap(obj):
+    import json
+    raw = json.dumps(obj, separators=(",", ":")).encode("utf-8")
     sig = _hmac(raw)
     body = raw + sig
     key = _k1() + _k2()
@@ -199,14 +200,24 @@ def _unwrap(s):
         return None
     key = _k1() + _k2()
     body = bytes(data[i] ^ key[i % len(key)] for i in range(len(data)))
-    if len(body) != 24:
+    # Kompatybilność wsteczna: stary format to 8 bajtów double + 16 bajtów HMAC.
+    if len(body) == 24:
+        raw, sig = body[:8], body[8:24]
+        if _hmac(raw) == sig:
+            try:
+                return struct.unpack(">d", raw)[0]
+            except struct.error:
+                return None
         return None
-    raw, sig = body[:8], body[8:24]
+    if len(body) < 16:
+        return None
+    raw, sig = body[:-16], body[-16:]
     if _hmac(raw) != sig:
         return None
     try:
-        return struct.unpack(">d", raw)[0]
-    except struct.error:
+        import json
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
         return None
 
 # Stan manipulacji — ustawiany gdy HMAC się nie zgadza.
@@ -294,59 +305,105 @@ def _all_locations():
     ]
 
 
-def _any_present():
-    if os.path.isfile(_trial_file()):
-        return True
-    if _shadow_present():
-        return True
-    if os.path.isfile(_trial_shadow_file()):
-        return True
-    return False
+def _read_state():
+    """Odczytuje i scala stan trialu ze wszystkich lokalizacji.
 
-
-def _best_trial_ts():
-    """Najwcześniejszy poprawny timestamp z wszystkich lokalizacji."""
-    best = None
+    Stan to słownik: start (pierwszy start), used (skumulowane sekundy
+    używania), seen (najnowszy zaobserwowany czas), net (kotwica czasu
+    z dat artykułów Onetu). Stare pliki (float) są migrowane na bieżąco.
+    """
+    states = []
     for _, raw in _all_locations():
         if not raw:
             continue
-        ts = _unwrap(raw)
-        if ts is None:
+        v = _unwrap(raw)
+        if v is None:
             continue
-        if best is None or ts < best:
-            best = ts
-    return best
+        if isinstance(v, float):
+            v = {"start": v, "used": 0.0, "seen": v, "net": None}
+        if isinstance(v, dict):
+            try:
+                start = float(v.get("start"))
+            except (TypeError, ValueError):
+                continue
+            used = float(v.get("used") or 0)
+            seen = v.get("seen")
+            seen = float(seen) if seen is not None else start
+            net = v.get("net")
+            net = float(net) if net is not None else None
+            v = {"start": start, "used": used, "seen": seen, "net": net}
+        states.append(v)
+    if not states:
+        return None
+    return _merge_states(states)
 
 
-def _write_all(wrapped):
+def _merge_states(states):
+    return {
+        "start": min(s["start"] for s in states),
+        "used": max(s["used"] for s in states),
+        "seen": max(s["seen"] for s in states if s["seen"] is not None),
+        "net": max((s["net"] for s in states if s["net"] is not None), default=None),
+    }
+
+
+def _write_state(st):
+    wrapped = _wrap(st)
     _write_file(_trial_file(), wrapped)
     _write_shadow(wrapped)
     _write_file(_trial_shadow_file(), wrapped)
 
 
+def _any_present():
+    for _, raw in _all_locations():
+        if raw is not None:
+            return True
+    return False
+
+
+def _best_trial_ts():
+    st = _read_state()
+    return st["start"] if st else None
+
+
 def trial_start():
     """Inicjalizuje i weryfikuje okres próbny.
 
-    Trial jest zapisany w trzech lokalizacjach: plik .trial, rejestr
-    HKCU\\Software\\NewsReader\\ts, ukryty plik nr.cfg w UsageLogs.
-    Dodatkowo rejestr przechowuje flagę 'installed' (zapisaną raz, nigdy
-    nie usuwaną) — zapobiega resetowi trial przez reinstalację.
-
-    Zasady:
-    - Brak wszystkich lokalizacji + brak flagi installed → pierwszy start (nowy trial).
-    - Brak wszystkich lokalizacji + flaga installed → blokada (reset przez usunięcie).
-    - Brak/uszkodzenie jakiejkolwiek lokalizacji (ale inne istnieją) → blokada.
-    - Wszystkie poprawne → normalne działanie.
+    Stan trialu (słownik start/used/seen/net) jest zapisyany w trzech
+    lokalizacjach: plik .trial, rejestr HKCU\\Software\\NewsReader\\ts,
+    ukryty plik nr.cfg w UsageLogs. Dodatkowo flaga 'installed' w osobnym
+    kluczu rejestru (nigdy nie usuwana) zapobiega resetowi przez
+    reinstalację/usunięcie. Skumulowany czas używania (used) jest
+    odporny na cofnięcie zegara: zaobserwowany czas jest niemalejący,
+    a jako kotwicy używamy dat artykułów Onetu (observe/observe_dates).
     """
     global _tampered
     locs = _all_locations()
-    valid_count = sum(1 for _, raw in locs if raw and _unwrap(raw) is not None)
+    valid = []
+    for _, raw in locs:
+        if not raw:
+            continue
+        v = _unwrap(raw)
+        if v is None:
+            continue
+        if isinstance(v, float):
+            # Migracja ze starego formatu (float) — przybliż użyte od teraz.
+            v = {"start": v, "used": max(0.0, time.time() - v), "seen": time.time(), "net": None}
+        elif isinstance(v, dict):
+            try:
+                v = {"start": float(v.get("start")),
+                     "used": float(v.get("used") or 0),
+                     "seen": float(v.get("seen") or v.get("start")),
+                     "net": (float(v["net"]) if v.get("net") is not None else None)}
+            except (TypeError, ValueError):
+                continue
+        valid.append(v)
     present_count = sum(1 for _, raw in locs if raw is not None)
     installed = _installed_flag()
 
     if present_count == 0 and not installed:
-        # Pierwszy start w życiu — utwórz trial wszędzie + flagę installed.
-        _write_all(_wrap(time.time()))
+        st = {"start": time.time(), "used": 0.0, "seen": time.time(), "net": None}
+        _write_state(st)
         _write_installed()
         return
 
@@ -355,34 +412,81 @@ def trial_start():
         _tampered = True
         return
 
-    # Coś istnieje — sprawdź spójność.
-    best_ts = _best_trial_ts()
-    if best_ts is None:
-        # Żadna lokalizacja nie ma poprawnych danych, ale coś istnieje.
+    if not valid:
         _tampered = True
         _write_installed()
         return
 
-    # Sprawdź czy wszystkie trzy są poprawne.
-    if valid_count != 3:
+    if len(valid) != 3:
         _tampered = True
-        wrapped_best = _wrap(best_ts)
-        for name, raw in locs:
-            ts = _unwrap(raw) if raw else None
-            if ts is None:
-                if name == "file":
-                    _write_file(_trial_file(), wrapped_best)
-                elif name == "reg":
-                    _write_shadow(wrapped_best)
-                elif name == "cfg":
-                    _write_file(_trial_shadow_file(), wrapped_best)
 
+    st = _merge_states(valid)
+    _write_state(st)
     _write_installed()
 
 
+def observe(local_now=None, net_ts=None):
+    """Rejestruje upływ czasu trialu (odporne na zmiany zegara).
+
+    - local_now: czas ścienny (domyślnie time.time()).
+    - net_ts: zaufany czas z dat artykułów Onetu (observe_dates).
+    Czas 'seen' jest niemalejący (blokuje cofnięcie zegara lokalnego);
+    kotwica 'net' uniemożliwia bankowanie czasu przez datę przyszłą i
+    przedłużanie przez rollback, bo pochodzi z serwerów Onetu.
+    """
+    global _tampered
+    if _tampered:
+        return
+    st = _read_state()
+    if st is None:
+        return
+    now_local = time.time() if local_now is None else float(local_now)
+    if net_ts is not None:
+        net = float(net_ts)
+        if st["net"] is None or net > st["net"]:
+            st["net"] = net
+    now = now_local
+    if st["net"] is not None:
+        # Sieciowa kotwica: nie pozwalamy lokalnemu zegarowi ani zacofać
+        # (rollback), ani uciec mocno w przyszłość (bankowanie czasu).
+        if now_local < st["net"]:
+            now = st["net"]
+        elif now_local > st["net"] + 2 * 86400:
+            now = st["net"]
+    if st["seen"] is not None and now < st["seen"]:
+        now = st["seen"]
+    delta = now - st["seen"] if st["seen"] is not None else 0.0
+    if delta < 0:
+        delta = 0.0
+    if delta > 7 * 86400:
+        delta = 7 * 86400
+    st["used"] += delta
+    st["seen"] = now if st["seen"] is None else max(st["seen"], now)
+    _write_state(st)
+
+
+def _net_estimate(ts_list):
+    """Mediana z 20 najnowszych dat — odporna na pojedynczy artykuł
+    z błędną datą przyszłą (np. +6 miesięcy)."""
+    ts = sorted(t for t in ts_list if t)
+    if not ts:
+        return None
+    top = ts[-20:]
+    n = len(top)
+    mid = n // 2
+    return top[mid] if n % 2 else (top[mid - 1] + top[mid]) / 2
+
+
+def observe_dates(ts_list):
+    """Obserwuje czas z listy dat publikacji (timestampy epoch)."""
+    est = _net_estimate(ts_list)
+    if est is not None:
+        observe(net_ts=est)
+
+
 def _read_trial():
-    """Zwraca najwcześniejszy poprawny timestamp, lub None."""
-    return _best_trial_ts()
+    st = _read_state()
+    return st["start"] if st else None
 
 
 def trial_start_ts():
@@ -390,12 +494,11 @@ def trial_start_ts():
 
 
 def trial_days_left():
-    """Ile pełnych dni zostało w okresie próbnym (>= 0)."""
-    ts = trial_start_ts()
-    if ts is None:
-        return 0.0 if _tampered else TRIAL_DAYS
-    elapsed = time.time() - ts
-    left = TRIAL_DAYS - elapsed / 86400.0
+    """Ile dni zostało w okresie próbnym (>= 0), wg skumulowanego użycia."""
+    st = _read_state()
+    if st is None:
+        return TRIAL_DAYS
+    left = TRIAL_DAYS - st["used"] / 86400.0
     return max(0.0, left)
 
 

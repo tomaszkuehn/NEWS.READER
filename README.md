@@ -339,16 +339,29 @@ realizowany po stronie bazy (`database.get_articles`, `hide_stale=True`).
 ## Okres próbny i klucz odblokowujący
 
 Aplikacja działa bez ograniczeń przez **30 dni** od pierwszego uruchomienia
-(`TRIAL_DAYS`, `license.trial_start`). Timestamp pierwszego startu jest
-zapisywany w pliku `.trial` (katalog danych aplikacji,
-`%APPDATA%\NewsReader` w wersji instalacyjnej). Po upływie 30 dni
-**odświeżanie** artykułów (ręczne i automatyczne) jest blokowane —
-przeglądanie zapisanych artykułów nadal działa.
+(`TRIAL_DAYS`, `license.trial_start`). Stan trialu (skumulowany czas
+używania, a nie sam timestamp startu) jest zapisywany w pliku `.trial`
+(katalog danych aplikacji, `%APPDATA%\NewsReader` w wersji instalacyjnej).
+Po upływie 30 dni **odświeżanie** artykułów (ręczne i automatyczne) jest
+blokowane — przeglądanie zapisanych artykułów nadal działa.
+
+**Odporność na zmiany zegara.** Czas używania jest akumulowany (niemalejący
+`seen`) i dodatkowo kotwiczony datami publikacji artykułów Onetu (pochodzą
+z serwerów, nie z zegara użytkownika). Przy każdym odświeżeniu i otwarciu
+artykułu liczona jest **mediana z 20 najnowszych dat** (odporna na pojedynczy
+artykuł z błędną datą przyszłą), która staje się dolną granicą „teraz".
+Dzięki temu:
+- **Instalacja z datą przyszłą** nie „bankuje" czasu — pojawienie się prawdziwych
+  dat artykułów kotwiczy trial do rzeczywistego czasu.
+- **Cofnięcie zegara** (rollback) nie przedłuża trialu — zaobserwowany czas
+  nigdy nie maleje, a kotwica sieciowa rośnie wraz z nowymi artykułami.
+Pełna odporność wymaga dostępu do sieci (pobierania artykułów); w trybie
+w pełni offline aplikacja i tak nie ma sensu użycia.
 
 Plik `.trial` jest **zaszyfrowany** (XOR z rozproszonym kluczem + HMAC-SHA256).
-Timestamp nie jest zapisany jawnie — edycja pliku w edytorze tekstu
-powoduje niezgodność HMAC i aplikacja wykrywa **niedozwoloną modyfikację**,
-blokując odświeżanie (komunikat w pasku i modalu „O aplikacji"). Odblokowanie
+Dane nie są zapisane jawnie — edycja pliku w edytorze tekstu powoduje
+niezgodność HMAC i aplikacja wykrywa **niedozwoloną modyfikację**, blokując
+odświeżanie (komunikat w pasku i modalu „O aplikacji"). Odblokowanie
 kluczem RSA nadal działa po wykryciu manipulacji.
 
 Trial jest zapisany w **trzech lokalizacjach** zapobiegających resetowi:
