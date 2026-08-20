@@ -466,19 +466,28 @@ def observe(local_now=None, net_ts=None):
 
 
 def _net_estimate(ts_list):
-    """Mediana z 20 najnowszych dat — odporna na pojedynczy artykuł
-    z błędną datą przyszłą (np. +6 miesięcy)."""
-    ts = sorted(t for t in ts_list if t)
+    """Szacuje bieżący czas z dat publikacji artykułów Onetu.
+
+    Daty są sortowane malejąco (najnowsze pierwsze); odrzucamy 5
+    najnowszych (aby zignorować nawet 5 artykułów z błędną datą
+    przyszłą) i bierzemy medianę z kolejnych 5. Gdy jest mniej niż
+    10 dat, używamy mediany ze wszystkich dostępnych (best effort)."""
+    ts = sorted((t for t in ts_list if t), reverse=True)
     if not ts:
         return None
-    top = ts[-20:]
-    n = len(top)
+    if len(ts) < 10:
+        n = len(ts)
+        mid = n // 2
+        return ts[mid] if n % 2 else (ts[mid - 1] + ts[mid]) / 2
+    window = ts[5:10]
+    n = len(window)
     mid = n // 2
-    return top[mid] if n % 2 else (top[mid - 1] + top[mid]) / 2
+    return window[mid] if n % 2 else (window[mid - 1] + window[mid]) / 2
 
 
 def observe_dates(ts_list):
-    """Obserwuje czas z listy dat publikacji (timestampy epoch)."""
+    """Obserwuje czas z listy dat publikacji (timestampy epoch).
+    Ignoruje do 5 artykułów z błędną datą przyszłą."""
     est = _net_estimate(ts_list)
     if est is not None:
         observe(net_ts=est)

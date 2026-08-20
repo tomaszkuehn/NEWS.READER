@@ -348,8 +348,11 @@ blokowane — przeglądanie zapisanych artykułów nadal działa.
 **Odporność na zmiany zegara.** Czas używania jest akumulowany (niemalejący
 `seen`) i dodatkowo kotwiczony datami publikacji artykułów Onetu (pochodzą
 z serwerów, nie z zegara użytkownika). Przy każdym odświeżeniu i otwarciu
-artykułu liczona jest **mediana z 20 najnowszych dat** (odporna na pojedynczy
-artykuł z błędną datą przyszłą), która staje się dolną granicą „teraz".
+artykułu liczona jest estymata czasu: z N najnowszych dat odrzucane jest
+**5 najnowszych** (by zignorować nawet 5 artykułów z błędną datą przyszłą),
+a z **kolejnych 5** brane jest **median** — co daje dokładną bieżącą datę,
+gdy liczba nowych artykułów przekracza 20. Estymata ta staje się dolną
+granicą „teraz".
 Dzięki temu:
 - **Instalacja z datą przyszłą** nie „bankuje" czasu — pojawienie się prawdziwych
   dat artykułów kotwiczy trial do rzeczywistego czasu.
