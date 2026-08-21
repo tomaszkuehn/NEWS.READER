@@ -388,14 +388,14 @@ wyczyszczenie wszystkiego (włącznie z kluczem `NativeImages\nr`) resetuje
 trial — ale to wymaga świadomego poszukiwania i usunięcia ukrytych wpisów.
 Odblokowanie kluczem RSA działa w każdym przypadku.
 
-Gdy do końca okresu próbnego zostało **5 dni lub mniej**, w pasku pod
-kategoriami pojawia się przypomnienie. Przy ręcznym odświeżaniu pojawia się
-**blokujące okno modalne** w kontrastowych kolorach (biało-czarne ostrzeżenie
-lub czerwono-białe zablokowanie), które trzeba zamknąć przyciskiem „Rozumiem",
-zanim można kontynuować:
+Powiadomienia licencyjne zaczynają się pojawiać **14 dni przed wygaśnięciem**
+okresu próbnego. W pasku pod kategoriami pojawia się przypomnienie. Przy
+ręcznym odświeżaniu pojawia się **blokujące okno modalne** w kontrastowych
+kolorach (biało-czarne ostrzeżenie lub czerwono-białe zablokowanie), które
+trzeba zamknąć przyciskiem „Rozumiem", zanim można kontynuować:
 
-- **Przed upływem** (raz na 24 h przy kliknięciu „Odśwież"): „To wersja próbna.
-  Bez aktywacji przestanie działać za X dni." (tryb ostrzeżenia).
+- **Przed upływem** (od 14. dnia, raz na 24 h przy kliknięciu „Odśwież"): „To
+  wersja próbna. Bez aktywacji przestanie działać za X dni." (tryb ostrzeżenia).
 - **Po upływie okresu próbnego**: „Czas na testowanie aplikacji upłynął.
   Proszę o aktywowanie aplikacji." (tryb zablokowania, przy każdym kliknięciu
   „Odśwież").

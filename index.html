@@ -770,6 +770,7 @@ async function refresh() {
 const TRIAL_NOTIFY_KEY = "trial_notify_at";
 function notifyTrialInfo(st) {
   if (st.unlocked) return;
+  if (st.trial_days_left > 14) return;
   const now = Date.now();
   const last = parseInt(localStorage.getItem(TRIAL_NOTIFY_KEY) || "0", 10);
   if (now - last < 24 * 3600 * 1000) return;
@@ -1077,7 +1078,7 @@ async function checkStatus() {
       setNote("Wykryto niedozwoloną modyfikację — wprowadź klucz, aby kontynuować");
     } else if (s.trial_expired && !s.unlocked) {
       setNote(`Okres próbny minął — wprowadź klucz, aby kontynuować pobieranie`);
-    } else if (!s.unlocked && s.trial_days_left <= 5) {
+    } else if (!s.unlocked && s.trial_days_left <= 14) {
       setNote(`Okres próbny: ${Math.ceil(s.trial_days_left)} dni zostało — wprowadź klucz, aby kontynuować po upływie`);
     }
     return s;
