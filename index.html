@@ -325,6 +325,9 @@
   .dropdown-menu button:hover:not(:disabled) { background: var(--panel2); }
   .dropdown-menu button:disabled { opacity: .45; cursor: default; }
   .dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .setting-row { padding: 8px 12px; font-size: 13px; }
+  .setting-row label { display: block; margin-bottom: 6px; color: var(--muted); }
+  .setting-row input[type=range] { width: 100%; }
 
   /* ===== About modal ===== */
   .modal-about { max-width: 520px; }
@@ -391,6 +394,11 @@
       <div id="settings-menu" class="dropdown-menu" style="display:none">
         <button type="button" id="menu-bg-set">Ustaw tło</button>
         <button type="button" id="menu-bg-clear" disabled>Usuń tło</button>
+        <div class="dropdown-sep"></div>
+        <div class="setting-row">
+          <label for="retention">Retencja artykułów: <strong id="retention-val">14</strong> dni</label>
+          <input type="range" id="retention" min="14" max="365" step="1" value="14">
+        </div>
         <div class="dropdown-sep"></div>
         <button type="button" id="menu-about">O aplikacji</button>
       </div>
@@ -1031,6 +1039,32 @@ document.addEventListener("click", (e) => {
   if (settingsMenu.style.display === "block" && !e.target.closest(".menu-wrap")) closeSettingsMenu();
 });
 $("menu-about").addEventListener("click", async () => { closeSettingsMenu(); await checkStatus(); openAboutModal(); });
+
+/* ===== Retencja artykułów (konfigurowalna 14-365 dni) ===== */
+const retentionEl = $("retention");
+const retentionVal = $("retention-val");
+async function loadRetention() {
+  try {
+    const r = await fetch("/api/settings");
+    const d = await r.json();
+    const v = Math.max(14, Math.min(365, parseInt(d.retention_days) || 14));
+    retentionEl.value = v;
+    retentionVal.textContent = v;
+  } catch (e) { /* zostaw domyślne */ }
+}
+retentionEl.addEventListener("input", () => { retentionVal.textContent = retentionEl.value; });
+retentionEl.addEventListener("change", async () => {
+  const v = parseInt(retentionEl.value, 10);
+  retentionVal.textContent = v;
+  try {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ retention_days: v }),
+    });
+  } catch (e) { /* błąd sieci — wartość zostanie ponowiona przy następnym odświeżeniu */ }
+});
+loadRetention();
 
 /* ===== Limit artykułów / klucz odblokowujący ===== */
 let lastStatus = null;

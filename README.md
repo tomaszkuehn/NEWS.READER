@@ -281,7 +281,7 @@ Pomijane są następujące treści:
 
 6. **Linki, które nie są kartami artykułów** — generyczny skan linków (w `scrape_category`) akceptuje tylko linki wewnątrz `<article>` **lub** z atrybutem `data-uuid-ui` (unikalne ID karty). To odfiltrowuje podstrony serwisu, które przypadkiem pasują do wzorca URL (np. Onet Chat AI `/czat/konwersacja` „Zadaj własne pytanie", strona autorów `/autorzy/...`, prognoza pogody `/prognoza-pogody/dlugoterminowa`).
 
-7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez `RETENTION_DAYS` (7 dni), na podstawie `last_seen`. **Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.**
+7. **Stare artykuły** — `cleanup_old()` usuwa wpisy nieaktualizowane przez czas retencji (domyślnie **14 dni**, konfigurowalne w menu ustawień w zakresie **14–365 dni**), na podstawie `last_seen`. **Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.** Ustawienie przechowywane jest w tabeli `settings` bazy danych.
 
 ## Ukryj nieaktualne
 
@@ -458,7 +458,7 @@ pojawia się na każdej karcie listy oraz w podglądzie artykułu. Filtry:
   oznaczone sercem (`/api/articles?favorite=true`).
 - **Retencja** — `cleanup_old()` pomija `is_favorite = 1`, więc ulubione
   artykuły nigdy nie są automatycznie usuwane z bazy, nawet po upływie
-  `RETENTION_DAYS`.
+  skonfigurowanego czasu retencji.
 - Oznaczenie jest zapisywane w kolumnie `is_favorite` i przeżywają ponowne
   skanowania (upsert nie nadpisuje tej kolumny).
 

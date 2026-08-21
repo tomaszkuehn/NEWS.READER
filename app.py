@@ -77,6 +77,22 @@ def unlock(req: UnlockReq):
         return {"ok": True, "unlocked": True}
     raise HTTPException(403, "Nieprawidłowy klucz")
 
+
+class SettingsReq(BaseModel):
+    retention_days: int
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"retention_days": database.retention_days()}
+
+
+@app.post("/api/settings")
+def post_settings(req: SettingsReq):
+    days = max(14, min(365, int(req.retention_days)))
+    database.set_setting("retention_days", days)
+    return {"retention_days": database.retention_days()}
+
 @app.post("/api/refresh")
 def refresh():
     """Odświeża artykuły z throttlingiem (min. 140 s między odświeżeniami)."""

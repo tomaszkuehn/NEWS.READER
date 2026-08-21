@@ -3,7 +3,7 @@ import sys
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-RETENTION_DAYS = 7
+RETENTION_DAYS = 14
 # Jak długo nowo odkryty artykuł jest widoczny w (wirtualnej) kategorii 'najnowsze'.
 FRESH_WINDOW = timedelta(hours=2)
 # „Ukryj nieaktualne" — domyślnie ukrywa artykuły starsze niż STALE_WINDOW
@@ -59,6 +59,10 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category);
             CREATE INDEX IF NOT EXISTS idx_articles_last_seen ON articles(last_seen);
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
         cols = {r[1] for r in conn.execute("PRAGMA table_info(articles)")}
@@ -258,12 +262,44 @@ def _iso_to_epoch(iso):
         return None
 
 
+def get_setting(key, default=None):
+    """Odczytuje ustawienie z tabeli settings (jako tekst) lub domyślną wartość."""
+    try:
+        with _connect() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return default
+        return row["value"]
+    except Exception:
+        return default
+
+
+def set_setting(key, value):
+    """Zapisuje ustawienie (wartość konwertowana na tekst)."""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO settings(key, value) VALUES(?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, str(value)),
+        )
+
+
+def retention_days():
+    """Liczba dni retencji artykułów (konfigurowalna, domyślnie RETENTION_DAYS)."""
+    try:
+        v = int(get_setting("retention_days", RETENTION_DAYS))
+    except (TypeError, ValueError):
+        v = RETENTION_DAYS
+    return max(14, min(365, v))
+
+
 def cleanup_old():
-    """Usuwa artykuły nieaktualizowane dłużej niż RETENTION_DAYS dni.
+    """Usuwa artykuły nieaktualizowane dłużej niż retention_days dni.
 
     Artykuły oznaczone jako ulubione nigdy nie są usuwane automatycznie.
     """
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
+    days = retention_days()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     with _connect() as conn:
         cur = conn.execute(
             "DELETE FROM articles WHERE last_seen < ? AND is_favorite = 0", (cutoff,)
