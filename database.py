@@ -127,13 +127,13 @@ def upsert_article(article):
             # Nadpisuj kategorię tylko jeśli wiemy lepiej (konkretna zamiast 'glowna')
             if old_cat == "glowna" and new_cat != "glowna":
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE article_key = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, category = ?, image = ?, is_premium = ?, published_at = COALESCE(published_at, NULLIF(?, '')), last_seen = ? WHERE article_key = ?",
                     (article.get("uuid", ""), article["title"], new_cat, article.get("image", ""),
                      int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), key),
                 )
             else:
                 conn.execute(
-                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, published_at = COALESCE(NULLIF(?, ''), published_at), last_seen = ? WHERE article_key = ?",
+                    "UPDATE articles SET uuid = ?, title = ?, image = ?, is_premium = ?, published_at = COALESCE(published_at, NULLIF(?, '')), last_seen = ? WHERE article_key = ?",
                     (article.get("uuid", ""), article["title"], article.get("image", ""),
                      int(article.get("is_premium", 0)), article.get("published_at", ""), now_iso(), key),
                 )
@@ -155,7 +155,7 @@ def mark_read_and_store(link, details):
         conn.execute(
             """
             UPDATE articles
-            SET is_read = 1, content = ?, image = ?, lead = ?, published_at = COALESCE(NULLIF(?, ''), published_at)
+            SET is_read = 1, content = ?, image = ?, lead = ?, published_at = COALESCE(published_at, NULLIF(?, ''))
             WHERE article_key = ?
             """,
             (details.get("content", ""), details.get("image", ""),
